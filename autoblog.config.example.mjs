@@ -53,6 +53,48 @@ export default {
     // Brand names that must NEVER be translated. The translator module
     // injects these as "keep as-is" instructions.
     brandNames: ['WhitelistVideo', 'YouTube', 'Google Family Link'],
+
+    // ─── STYLE GUIDE (optional) ───────────────────────────────────────
+    //
+    // Provide brand voice rules and/or a reference blog post to shape
+    // the writing style. Affects BOTH the writer (initial generation)
+    // and the humanizer (style transformation after AI pattern removal).
+    //
+    // Two types of guidance, used together or independently:
+    //
+    //   voice         — Prescriptive rules ("write in second person",
+    //                   "short paragraphs", "no jargon"). Think of this
+    //                   as a style sheet.
+    //
+    //   referencePost — A demonstrative example. Paste the full text of
+    //                   a blog post that exemplifies your ideal style.
+    //                   The pipeline studies its rhythm, vocabulary,
+    //                   sentence length, and paragraph pacing — then
+    //                   matches it. Does NOT copy content.
+    //
+    // For each type, you can provide the content inline OR as a file
+    // path. File takes precedence when both are set.
+    //
+    // TIPS:
+    //   - Voice rules: keep under 500 words. Use observable rules, not
+    //     vague adjectives ("short paragraphs" > "engaging tone").
+    //   - Reference post: pick ONE representative post. Strip dates and
+    //     product-specific facts that shouldn't be mimicked.
+    //   - When active, the humanizer uses a higher temperature (0.7 vs
+    //     0.3) to allow more creative rewriting toward your style.
+    //   - Omitting styleGuide entirely preserves default behavior.
+    //
+    styleGuide: {
+      // Brand voice rules — inline text (markdown or plain text)
+      voice: null,
+      // OR load from file (takes precedence over inline when both set)
+      voiceFile: null,
+
+      // Reference blog post — inline full text
+      referencePost: null,
+      // OR load from file
+      referencePostFile: null,
+    },
   },
 
   // ═══════════════════════════════════════════════════════════════════════════

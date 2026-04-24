@@ -265,6 +265,52 @@ schedule: {
 
 ---
 
+### How do I match a specific writing style? → `product.styleGuide`
+
+If you have a human-written blog post that captures your ideal tone and style, or brand voice rules you want every post to follow, you can feed these into the pipeline.
+
+```js
+product: {
+  // ... name, url, features, etc.
+
+  styleGuide: {
+    // Option 1: Inline brand voice rules
+    voice: `
+      Write in second person ("you", not "parents").
+      Short paragraphs — 2-3 sentences max.
+      No jargon. If you must use a technical term, define it immediately.
+      Start sections with a direct answer, then elaborate.
+      Use "but" and "and" to start sentences occasionally.
+    `,
+
+    // Option 2: Load from a file
+    // voiceFile: './style/voice-rules.md',
+
+    // Option 3: Provide a reference post to match
+    // referencePost: '...full text of a blog post...',
+    // referencePostFile: './style/reference-post.md',
+  },
+}
+```
+
+**Two types of guidance:**
+
+| Type | What it does | When to use |
+|------|-------------|-------------|
+| `voice` | Prescriptive rules the writer follows | You can articulate your style as rules ("short paragraphs", "second person", "no jargon") |
+| `referencePost` | The pipeline studies a sample post and matches its rhythm, vocabulary, and structure | You have a post that "sounds right" but can't articulate why |
+
+**How it works in the pipeline:**
+
+1. **Writer step** — style guide is injected into the generation prompt, so the initial draft is already closer to your target style
+2. **Humanizer step** — after removing AI patterns, the humanizer applies a second transformation toward your reference style. Temperature increases from 0.3 → 0.7 to allow more creative rewriting
+
+**File vs inline:** For both `voice` and `referencePost`, you can provide content inline in the config or point to a file. File takes precedence when both are set. Use files when the content is long or shared across projects.
+
+**Omitting `styleGuide`:** Zero behavior change. The pipeline runs exactly as before.
+
+---
+
 ### What sources should it use? → Built into the research step
 
 The pipeline uses **Gemini with Google Search grounding** for topic research. This means:
@@ -504,7 +550,8 @@ lib/pipeline.mjs ─── Orchestrates 9 steps in sequence
         ├── lib/keyword-research.mjs ── DataForSEO REST API (4 endpoints)
         ├── lib/linker.mjs ──────────── Internal linking (keyword-to-slug index)
         ├── lib/writer.mjs ──────────── Blog post generation with GEO/AEO rules
-        ├── lib/humanizer.mjs ───────── AI pattern removal (Wikipedia-based)
+        ├── lib/style-guide.mjs ─────── Style guide resolver (voice + reference post)
+        ├── lib/humanizer.mjs ───────── AI pattern removal + style matching
         ├── lib/validator.mjs ───────── Quality gate + GEO/AEO scoring (0 API calls)
         ├── lib/readability.mjs ─────── Flesch-Kincaid grade level (0 API calls)
         ├── lib/image-generator.mjs ─── Cover image via Gemini image model
@@ -756,7 +803,8 @@ autoblog/
 │   ├── deduper.mjs                # Semantic deduplication
 │   ├── keyword-research.mjs       # DataForSEO integration
 │   ├── writer.mjs                 # Post generation (GEO/AEO compliant)
-│   ├── humanizer.mjs              # AI pattern removal
+│   ├── style-guide.mjs            # Style guide resolver
+│   ├── humanizer.mjs              # AI pattern removal + style matching
 │   ├── validator.mjs              # Quality gate + GEO/AEO scoring
 │   ├── linker.mjs                 # Internal linking
 │   ├── readability.mjs            # Flesch-Kincaid scoring
