@@ -47,6 +47,9 @@
   "bugs": {
     "url": "https://github.com/arul-buk/autoblog/issues"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "author": "StayBoba",
   "license": "MIT"
 }

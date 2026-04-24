@@ -137,7 +137,7 @@ async function main() {
 
   for (const result of successful) {
     log(`  ✓ ${result.slug} (${result.scheduleMode})`);
-    if (result.translations.size > 0) {
+    if (result.translations && result.translations.size > 0) {
       log(`    Translations: ${[...result.translations.keys()].join(', ')}`);
     }
     if (result.imagePath) {
