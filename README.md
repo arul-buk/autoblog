@@ -1,186 +1,419 @@
 # @stayboba/autoblog
 
-Config-driven automated blog content pipeline powered by Gemini + DataForSEO.
+**Automated blog content pipeline that writes, optimizes, and publishes SEO-compliant blog posts on autopilot.**
 
-One config file per site. The pipeline handles everything: topic discovery, deduplication, keyword research, writing, humanization, validation, cover images, and translation.
+You describe your product, define your topic areas, and set a schedule. The pipeline discovers trending topics, researches real keyword data, writes full blog posts, removes AI writing patterns, generates cover images, and translates to multiple languages — all from a single config file.
 
-## Quick Start
+Built for SaaS companies, content teams, and agencies that want a repeatable, quality-controlled blog pipeline running via GitHub Actions or manual execution.
+
+---
+
+## Table of Contents
+
+- [What You Need Before Starting](#-what-you-need-before-starting)
+- [Setup (5 Minutes)](#-setup-5-minutes)
+- [Controlling What the Blog Writes About](#-controlling-what-the-blog-writes-about)
+- [How the Pipeline Works](#-how-the-pipeline-works)
+- [Content Quality and SEO Compliance](#-content-quality-and-seo-compliance)
+- [Tech Stack and Architecture](#-tech-stack-and-architecture)
+- [Configuration Reference](#-configuration-reference)
+- [Running on Autopilot (GitHub Actions)](#-running-on-autopilot-github-actions)
+- [For AI Agents — Setting Up Autoblog in a New Project](#-for-ai-agents--setting-up-autoblog-in-a-new-project)
+
+---
+
+## 📋 What You Need Before Starting
+
+### Accounts and Keys
+
+| What | Where to get it | Required? | Cost |
+|------|----------------|-----------|------|
+| **Gemini API key** | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | Yes | Free tier available; paid for heavy usage |
+| **DataForSEO account** | [app.dataforseo.com/register](https://app.dataforseo.com/register) | Optional | ~$0.04-0.20 per post for real keyword data |
+
+> **Without DataForSEO:** The pipeline still works. Gemini picks keywords on its own. Results are decent but not data-driven. You can start without it and add it later.
+
+### Technical Requirements
+
+| What | Minimum version |
+|------|----------------|
+| Node.js | v20.0.0+ |
+| npm | v9+ |
+| Git | Any recent version |
+| A website framework that renders markdown | Next.js, Hugo, Jekyll, Gatsby, Astro, etc. |
+
+### Cost Per Blog Post
+
+| Pipeline mode | What's included | Cost |
+|---------------|----------------|------|
+| **Full pipeline** (6 translations) | Research + keywords + write + humanize + image + 6 translations | ~$0.12-0.17 |
+| **English + polished** | Research + keywords + write + humanize + image | ~$0.05 |
+| **Budget mode** | Research + write + image only | ~$0.02-0.04 |
+
+---
+
+## 🚀 Setup (5 Minutes)
+
+### Step 1 — Get the code
 
 ```bash
-# 1. Copy the example config
+git clone https://github.com/arul-buk/autoblog.git
+cd autoblog
+npm install
+```
+
+### Step 2 — Create your config
+
+```bash
 cp autoblog.config.example.mjs autoblog.config.mjs
+```
 
-# 2. Edit the config with your product details, authors, and topic clusters
+Open `autoblog.config.mjs` and fill in three sections (explained in detail in the [next section](#-controlling-what-the-blog-writes-about)):
 
-# 3. Set environment variables
+1. **Your product** — name, URL, description, features
+2. **Your authors** — who writes the blog (can be fictional personas)
+3. **Your topics** — what the blog covers
+
+### Step 3 — Set your API key
+
+```bash
 export GEMINI_API_KEY="your-gemini-api-key"
-export DATAFORSEO_LOGIN="your-login"        # optional, only if seo.enabled
-export DATAFORSEO_PASSWORD="your-password"  # optional, only if seo.enabled
-
-# 4. Run
-npx autoblog              # full run — generates and saves 1 post
-npx autoblog --dry-run    # preview without saving files
-npx autoblog --batch 5    # generate 5 posts (seeding mode)
-npx autoblog --config ./path/to/config.mjs  # custom config path
 ```
 
-## Pipeline
+### Step 4 — Run it
 
-9 steps, each independently toggleable via `config.steps`:
-
-```
-Schedule Check ─> Research ─> Dedupe ─> Keyword Research ─> Write
-                                                              │
-Translate <── Image <── Validate <── Humanize <───────────────┘
+```bash
+npx autoblog --dry-run    # preview without saving files (recommended first time)
+npx autoblog              # generate and save one blog post
+npx autoblog --batch 5    # generate 5 posts at once (for seeding a new blog)
 ```
 
-| Step | What it does | API calls | Toggle |
-|------|-------------|-----------|--------|
-| **Schedule** | Checks content calendar for today's entry | 0 | `steps.calendar` |
-| **Research** | Gemini + Google Search grounded topic discovery | 1 | `steps.research` |
-| **Dedupe** | Semantic dedup against existing posts | 1 | `steps.dedupe` |
-| **Keyword Research** | DataForSEO: volumes, difficulty, PAA, competitors | 4 | `steps.keywordResearch` |
-| **Write** | Gemini generates full post with frontmatter | 1 | always on |
-| **Humanize** | Removes AI writing patterns (Wikipedia-based rules) | 1 | `steps.humanize` |
-| **Validate** | Word count, frontmatter, readability, CTA markers | 0 | `steps.validate` |
-| **Image** | Gemini generates 16:9 cover image | 1 | `steps.image` |
-| **Translate** | Multi-language translation (6 langs = 6 calls) | N | `steps.translate` |
+### What you get
 
-**Cost per post:** ~$0.12-0.17 (full pipeline with 6 translations).
+After running, you'll find:
 
-## Config
+```
+_posts/
+├── your-topic-slug.md              # Full blog post (frontmatter + body)
+├── es/your-topic-slug.md           # Spanish translation
+├── fr/your-topic-slug.md           # French translation
+├── ...                              # Other configured languages
 
-Everything lives in `autoblog.config.mjs`. See [`autoblog.config.example.mjs`](./autoblog.config.example.mjs) for the complete reference with inline documentation.
+public/images/blog/
+└── your-topic-slug.png             # AI-generated cover image (16:9)
+```
 
-### Required sections
+---
+
+## 📝 Controlling What the Blog Writes About
+
+This is the most important section. Everything the pipeline writes — topics, tone, product mentions, sources, audience — is controlled through `autoblog.config.mjs`. Here's exactly where each decision lives.
+
+---
+
+### What is the blog about? → `product` section
+
+This is the foundation. The pipeline injects your product context into every prompt, so the LLM knows what it's writing for.
 
 ```js
-export default {
-  product: {
-    name: 'YourProduct',
-    url: 'https://yoursite.com',
-    description: 'One-sentence product description',
-    features: ['Feature — benefit description', ...],
-  },
-  authors: [
-    { name: 'Jane Doe', role: 'Writer', image: '/img/jane.png', categories: ['Tech'] },
+product: {
+  // Your product/brand name — appears in blog posts
+  name: 'AcmeSaaS',
+
+  // Your website — used for links in the content
+  url: 'https://acme.com',
+
+  // One-sentence description — tells the LLM what category you're in
+  description: 'Project management tool for remote engineering teams',
+
+  // Features the LLM can reference in articles
+  // Be specific — the LLM weaves these into posts contextually
+  features: [
+    'Async Standups — automated daily standups across time zones',
+    'Sprint Analytics — track velocity without manual calculation',
+    'Slack Integration — manage tasks without leaving Slack',
   ],
-  topics: {
-    clusters: [
-      { name: 'Tech', queries: ['your niche topic 2026', ...] },
-    ],
-  },
-};
-```
 
-### Step toggles
-
-Disable steps you don't need. Each disabled step = zero API calls for that step.
-
-```js
-steps: {
-  calendar: true,        // content calendar
-  research: true,        // trending topic discovery
-  dedupe: true,          // semantic deduplication
-  keywordResearch: true, // DataForSEO enrichment
-  write: true,           // always runs
-  humanize: true,        // AI pattern removal
-  validate: true,        // quality gate
-  internalLinking: true, // cross-linking
-  image: true,           // cover image
-  translate: true,       // multi-language
+  // Tone instruction — one sentence that shapes the voice
+  tone: 'Technical but approachable. Write for engineering managers, not executives.',
 }
 ```
 
-**Common presets:**
+**What this controls:** Every blog post will reference your product naturally, mention relevant features in context, and link back to your site. The tone instruction affects vocabulary, complexity, and style across all generated content.
 
-| Use case | Disabled steps | Cost |
-|----------|---------------|------|
-| Full pipeline | none | ~$0.15/post |
-| Budget mode | keywordResearch, humanize, translate | ~$0.02/post |
-| English only | translate | ~$0.05/post |
-| Manual topics only | research, calendar | ~$0.12/post |
+---
 
-### DataForSEO keyword research
+### What topics does it cover? → `topics.clusters` section
 
-When `seo.enabled: true`, the pipeline calls DataForSEO before writing to get real search data:
+Topic clusters define the **content pillars** your blog writes about. Each cluster has a name and a list of Google Search queries the pipeline uses to find trending topics.
 
-- **Keyword overview** — search volume + difficulty for seed keywords
-- **Related keywords** — expanded terms filtered by volume and difficulty
-- **SERP competitors** — top-ranking pages and their angles
-- **Keyword suggestions (questions)** — People Also Ask data for the FAQ section
+```js
+topics: {
+  clusters: [
+    {
+      name: 'Remote Work',              // Category name (matches authors)
+      queries: [                        // Search queries for topic discovery
+        'remote team management challenges 2026',
+        'async communication best practices',
+        'remote engineering team productivity',
+      ],
+    },
+    {
+      name: 'Competitor',
+      queries: [
+        'Jira alternative for remote teams',
+        'Linear vs Asana comparison',
+        'best project management tool review 2026',
+      ],
+    },
+    {
+      name: 'Engineering Culture',
+      queries: [
+        'sprint retrospective techniques',
+        'engineering team burnout prevention',
+        'developer experience metrics',
+      ],
+    },
+  ],
+}
+```
 
-This data is injected into the writer prompt, producing posts that target real search queries instead of Gemini's guesses.
+**Tips for writing good search queries:**
+- Include the current year for recency: `"remote work trends 2026"`
+- Mix broad and specific: `"project management"` (broad) + `"async standup tools for distributed teams"` (specific)
+- Include competitor names if you want comparison content: `"Jira vs Linear"`, `"Asana alternative"`
+- Include question formats: `"how to run sprint retros remotely"`
+- Aim for 3-8 queries per cluster, 3-6 clusters total
+
+**What this controls:** The pipeline searches Google for these queries, finds trending articles and discussions, and generates blog post ideas from the results. It will never write about topics outside your clusters unless you add them.
+
+---
+
+### What geographic angles should it cover? → `topics.regionalContexts`
+
+Optional. Adds geographic diversity to topic research.
+
+```js
+topics: {
+  regionalContexts: [
+    { region: 'United States', focus: 'tech layoffs, return-to-office mandates' },
+    { region: 'Europe', focus: 'GDPR implications for project management tools' },
+    { region: 'India', focus: 'growing IT outsourcing market, time zone challenges' },
+  ],
+}
+```
+
+**What this controls:** The pipeline considers these regional angles when generating topics, producing content relevant to different markets.
+
+---
+
+### Who writes the posts? → `authors` section
+
+Define author personas. The pipeline automatically picks the best author for each topic based on category matching.
+
+```js
+authors: [
+  {
+    name: 'Alex Rivera',
+    role: 'Engineering Lead',
+    image: '/images/authors/alex.png',
+    categories: ['Remote Work', 'Engineering Culture'],  // writes about these topics
+  },
+  {
+    name: 'Priya Sharma',
+    role: 'Product Analyst',
+    image: '/images/authors/priya.png',
+    categories: ['Competitor', 'Product'],
+  },
+],
+fallbackAuthor: 'Alex Rivera',  // used when no category match
+```
+
+**What this controls:** Each post gets an appropriate byline. Author names, roles, and images appear in the frontmatter. The pipeline won't randomly assign authors — it matches by category.
+
+---
+
+### What NOT to include → `topics.clusters` (by exclusion) + `product.tone`
+
+The pipeline only writes about topics that match your search queries. If you don't include queries about a subject, it won't write about it.
+
+To explicitly steer away from certain content:
+
+```js
+product: {
+  // The tone instruction can include "don't" guidance
+  tone: 'Technical but approachable. Never write about pricing. ' +
+        'Avoid mentioning specific customer names. ' +
+        'Do not compare on price — compare on features only.',
+}
+```
+
+You can also add negative guidance through the content calendar:
+
+```js
+schedule: {
+  calendar: [
+    {
+      date: '2026-06-01',
+      topic: 'Linear vs AcmeSaaS Feature Comparison',
+      notes: 'Do NOT mention pricing. Focus only on feature differences. ' +
+             'Acknowledge Linear strengths honestly. Do not bash competitors.',
+    },
+  ],
+}
+```
+
+---
+
+### What sources should it use? → Built into the research step
+
+The pipeline uses **Gemini with Google Search grounding** for topic research. This means:
+
+- It searches real, current Google results (not just LLM training data)
+- It finds recent news articles, blog posts, and social media discussions
+- It prioritizes content from the last 7 days (configurable via `topics.recencyDays`)
+
+You control source quality through your search queries:
+- **Broad queries** → pulls from mainstream tech publications, news sites
+- **Specific queries** → pulls from niche blogs, industry reports, Reddit/Twitter discussions
+- **Academic queries** → add terms like "study", "research", "data" to your queries
+
+The writer prompt instructs the LLM to **attribute all statistics** with source and year inline. Vague attribution ("studies show", "experts say") is explicitly prohibited.
+
+```js
+topics: {
+  recencyDays: 7,       // only consider sources from last N days
+  maxCandidates: 5,     // how many topic ideas to generate before deduplication
+}
+```
+
+---
+
+### What SEO keywords should it target? → `seo` section
+
+**Without DataForSEO** (`seo.enabled: false`): Gemini picks keywords based on its own judgment. Works fine, but not data-driven.
+
+**With DataForSEO** (`seo.enabled: true`): The pipeline gets real search volume, keyword difficulty, related terms, and People Also Ask questions before writing. This data is injected into the writer prompt.
 
 ```js
 seo: {
   enabled: true,
   apiLogin: process.env.DATAFORSEO_LOGIN,
   apiPassword: process.env.DATAFORSEO_PASSWORD,
-  location: 2840,          // US (see config example for other codes)
-  maxDifficulty: 60,       // skip keywords above this score
-  minSearchVolume: 100,    // ignore low-volume keywords
-  maxRelatedKeywords: 10,  // how many secondaries to pass to writer
+  location: 2840,            // US search data (see config example for other country codes)
+  maxDifficulty: 60,         // skip keywords harder than this (0-100 scale)
+  minSearchVolume: 100,      // ignore keywords with fewer monthly searches
+  maxRelatedKeywords: 10,    // how many secondary keywords to pass to the writer
 }
 ```
 
-### Content calendar
+**What this controls:** The blog targets real search queries with known volume. Posts include primary and secondary keywords naturally, and FAQ sections use real "People Also Ask" questions.
 
-Two-level scheduling: **when** the pipeline runs (cron) and **what** it writes about (calendar).
+---
 
+### When should it publish? → `schedule` section
+
+Two levels of control:
+
+**Level 1 — How often** (cron expression):
 ```js
 schedule: {
-  // Level 1: run frequency
-  cron: '17 8 */3 * *',  // every 3 days at 8:17 UTC
-  postsPerRun: 1,
-
-  // Level 2: editorial calendar (optional)
-  calendar: [
-    // Minimal — steer toward a category
-    { date: '2026-05-01', category: 'Regulation' },
-
-    // Specific topic — skip research entirely
-    { date: '2026-05-04', topic: 'Australia Under-16 Ban Takes Effect' },
-
-    // Full control
-    {
-      date: '2026-05-08',
-      topic: 'Qustodio vs YourProduct Compared',
-      category: 'Competitor',
-      keywords: ['qustodio alternative', 'best parental control'],
-      notes: 'Position as objective comparison.',
-      priority: 'high',  // skips dedupe
-    },
-  ],
-
-  // Or load from external file:
-  // calendarFile: './content-calendar.mjs',
+  cron: '17 8 */3 * *',   // every 3 days at 8:17 UTC
+  postsPerRun: 1,          // posts per execution
 }
 ```
 
-Days without calendar entries fall back to trending topic research. The pipeline always produces content.
+**Level 2 — What to write on specific days** (content calendar):
+```js
+schedule: {
+  calendar: [
+    // Just steer toward a category — research finds the specific topic
+    { date: '2026-06-01', category: 'Remote Work' },
 
-## GEO / AEO / Schema Compliance
+    // Specify an exact topic — skips research entirely
+    { date: '2026-06-04', topic: 'How to Run Async Standups That Actually Work' },
 
-Every generated post is optimized for traditional search engines AND AI-powered search (Google AI Overviews, ChatGPT, Perplexity, Bing Copilot). The writer prompt enforces these structures and the validator scores compliance (0-100).
+    // Full editorial control
+    {
+      date: '2026-06-08',
+      topic: 'Linear vs AcmeSaaS: 2026 Feature Comparison',
+      category: 'Competitor',
+      keywords: ['linear alternative', 'best project management tool'],
+      notes: 'Objective comparison. Acknowledge Linear strengths.',
+      priority: 'high',  // skip deduplication (intentional overlap with existing post)
+    },
+  ],
+}
+```
 
-### What the writer generates
+**Days without calendar entries** → the pipeline discovers trending topics automatically.  
+**Days with calendar entries** → the pipeline follows your instructions.
 
-| Structure | Purpose | Checked by validator |
-|-----------|---------|---------------------|
-| **TL;DR section** | Self-contained summary block AI overviews can extract | Yes |
-| **Key Takeaways** | 4-6 citable bullet points, each a complete statement | Yes |
-| **Question-based headings** | H2/H3 as "What/How/Why" questions (3+ required) | Yes (count) |
-| **Direct-answer paragraphs** | Each section opens with a quotable 1-2 sentence answer | Yes (filler detection) |
-| **FAQ section** | Dedicated section with H3 questions and self-contained answers | Yes |
-| **Entity definitions** | 1-sentence definitions on first mention of concepts | Prompt-enforced |
-| **Attributed statistics** | Every stat cites source and year inline | Prompt-enforced |
-| **Schema frontmatter** | `schema.type`, `schema.headline`, `schema.wordCount` for JSON-LD | Yes |
-| **qa frontmatter** | 4-5 Q&A pairs powering FAQ rich snippets | Yes (count) |
+---
 
-### GEO/AEO score
+## ⚙️ How the Pipeline Works
 
-The validator outputs a GEO/AEO score (0-100) based on 7 checks:
+9 steps, executed in sequence. Each step can be turned on or off independently.
+
+```
+┌──────────┐   ┌──────────┐   ┌─────────┐   ┌───────────┐   ┌─────────┐
+│ Schedule │──>│ Research  │──>│ Dedupe  │──>│ Keywords  │──>│  Write  │
+│ (calendar)│   │ (Gemini+  │   │ (Gemini │   │(DataForSEO)│   │(Gemini) │
+│          │   │  Google)  │   │semantic)│   │           │   │         │
+└──────────┘   └──────────┘   └─────────┘   └───────────┘   └────┬────┘
+                                                                   │
+┌──────────┐   ┌──────────┐   ┌──────────┐   ┌───────────┐        │
+│Translate │<──│  Image   │<──│ Validate │<──│ Humanize  │<───────┘
+│(Gemini×N)│   │ (Gemini) │   │ (local)  │   │ (Gemini)  │
+└──────────┘   └──────────┘   └──────────┘   └───────────┘
+```
+
+| # | Step | What happens | API calls | Toggle |
+|---|------|-------------|-----------|--------|
+| 1 | **Schedule** | Checks content calendar for today. Uses calendar entry if found, otherwise proceeds to research. | 0 | `steps.calendar` |
+| 2 | **Research** | Searches Google (via Gemini grounding) for trending topics matching your clusters. Returns 10-15 candidates ranked by recency. | 1 | `steps.research` |
+| 3 | **Dedupe** | Sends candidates + all existing post titles to Gemini. Catches semantic duplicates even with different wording. | 1 | `steps.dedupe` |
+| 4 | **Keywords** | Calls DataForSEO: keyword volumes, difficulty, related terms, SERP competitors, People Also Ask. Injects data into writer prompt. | 4 | `steps.keywordResearch` |
+| 5 | **Write** | Gemini generates the full post: YAML frontmatter + HTML/markdown body. Includes product context, keyword data, GEO/AEO rules. | 1 | Always on |
+| 6 | **Humanize** | Second Gemini pass removes AI writing patterns (significance inflation, promotional language, filler, structural tells). | 1 | `steps.humanize` |
+| 7 | **Validate** | Local quality check: word count, frontmatter fields, readability score, GEO/AEO compliance score. Zero API calls. | 0 | `steps.validate` |
+| 8 | **Image** | Gemini generates a 16:9 conceptual cover illustration. Saves as PNG. | 1 | `steps.image` |
+| 9 | **Translate** | Translates to each configured language. Brand names preserved. Partial success: saves what succeeds. | N | `steps.translate` |
+
+---
+
+## 🔍 Content Quality and SEO Compliance
+
+### Humanization — Removing AI Writing Patterns
+
+Every post passes through an AI pattern removal step based on [Wikipedia's "Signs of AI writing"](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing). The humanizer targets:
+
+| Pattern | Examples removed |
+|---------|-----------------|
+| Significance inflation | "pivotal", "testament", "key turning point", "evolving landscape" |
+| Promotional language | "boasts", "vibrant", "nestled", "breathtaking", "renowned" |
+| AI vocabulary (Tier 1) | "delve", "tapestry", "leverage", "paradigm shift", "myriad" |
+| AI vocabulary (Tier 2) | "robust", "seamless", "cutting-edge", "transformative", "bolster" |
+| Structural tells | Uniform section lengths, repeated "takeaway" patterns, rule-of-three overuse |
+| Hedging and filler | "It's important to note that...", "In order to", "Due to the fact that" |
+| Generic conclusions | "The future looks bright", "Exciting times ahead", "Only time will tell" |
+
+### GEO/AEO Compliance — Optimized for AI Search Engines
+
+Every post is structured for both traditional Google search **and** AI-powered search (Google AI Overviews, ChatGPT, Perplexity, Bing Copilot).
+
+| Structure | Why it matters | How it's checked |
+|-----------|---------------|-----------------|
+| **TL;DR section** | AI overviews extract and cite summary blocks | Validator checks for presence |
+| **Key Takeaways** (4-6 bullets) | Perplexity and ChatGPT cite bullet lists | Validator checks for presence |
+| **Question-based headings** (3+) | Matches People Also Ask queries | Validator counts question headings |
+| **Direct-answer paragraphs** | AI engines extract the first sentence after headings | Validator detects filler openers |
+| **FAQ section** | Powers FAQ rich snippets and AI answer boxes | Validator checks for presence |
+| **Entity definitions** | AI engines extract definitions | Enforced in writer prompt |
+| **Attributed statistics** | AI engines penalize unattributed claims | Enforced in writer prompt |
+| **Schema-ready frontmatter** | `BlogPosting` + `FAQPage` JSON-LD data | Validator checks for `schema` and `qa` fields |
+
+The validator outputs a **GEO/AEO score** (0-100):
 
 ```
 Step 7/9: Validating post quality...
@@ -189,166 +422,354 @@ Step 7/9: Validating post quality...
   ✓ Validation passed
 ```
 
-Scores below 70 produce warnings identifying which structures are missing.
+### Schema Markup
 
-### Schema markup
+The pipeline generates **schema-ready frontmatter** — your website renders it as JSON-LD:
 
-The autoblog generates schema-ready frontmatter. Your consuming website's template should render this as JSON-LD:
-
-```js
-// Frontmatter generated by autoblog:
+```yaml
+# Generated by autoblog in frontmatter:
 schema:
   type: "BlogPosting"
-  headline: "Can Kids Bypass YouTube Parental Controls in 2026?"
-  description: "A guide to YouTube parental control bypass methods..."
+  headline: "How to Run Async Standups That Actually Work"
+  description: "Async standups eliminate timezone pain..."
   wordCount: 1247
-  keywords: "youtube parental controls, bypass restricted mode"
+  keywords: "async standups, remote standup tool"
 qa:
-  - question: "Can kids bypass YouTube Restricted Mode?"
-    answer: "Yes. YouTube Restricted Mode can be disabled in..."
-  - question: "What is the most bypass-proof parental control?"
-    answer: "Channel-level whitelisting is the most bypass-proof..."
+  - question: "How do async standups work?"
+    answer: "Team members post updates at any time during their workday..."
+  - question: "Are async standups better than live standups?"
+    answer: "For distributed teams across 3+ time zones, async standups..."
 ```
 
-Your site template converts `qa` to `FAQPage` schema and `schema` fields to `BlogPosting` JSON-LD. The autoblog does not inject `<script type="application/ld+json">` into the markdown — that's the website's responsibility.
+Your website template converts `schema` → `BlogPosting` JSON-LD and `qa` → `FAQPage` JSON-LD. The autoblog does not inject `<script>` tags into the markdown — that's your website's responsibility.
 
-### Passage-level citability
+### Readability Scoring
 
-AI search engines cite content at the passage level, not the page level. The writer is instructed to:
+Flesch-Kincaid grade level, calculated locally (zero API calls):
 
-1. **Start sections with direct answers** — not vague setup ("In today's world...")
-2. **Write self-contained paragraphs** — each quotable without surrounding context
-3. **Use the pattern**: Direct answer → Evidence/data → Nuance/context
-4. **Avoid cross-references** in FAQ answers ("as mentioned above") — each answer stands alone
-
-## Project Structure
-
-```
-├── bin/
-│   └── autoblog.mjs           # CLI entry point
-├── lib/
-│   ├── config.mjs              # Config loader + validation
-│   ├── retry.mjs               # Exponential backoff (rate limit aware)
-│   ├── scheduler.mjs           # Content calendar resolution
-│   ├── topics.mjs              # Gemini + Google Search topic research
-│   ├── deduper.mjs             # Semantic deduplication
-│   ├── keyword-research.mjs    # DataForSEO keyword enrichment
-│   ├── writer.mjs              # Blog post generation
-│   ├── humanizer.mjs           # AI pattern removal
-│   ├── validator.mjs           # Post-generation quality gate
-│   ├── linker.mjs              # Internal linking strategy
-│   ├── readability.mjs         # Flesch-Kincaid scoring
-│   ├── translator.mjs          # Multi-language translation
-│   ├── image-generator.mjs     # Cover image generation
-│   └── pipeline.mjs            # 9-step orchestrator
-├── templates/
-│   └── github-workflow.yml     # GitHub Actions workflow template
-├── autoblog.config.example.mjs # Full config reference
-└── package.json
+```js
+readability: {
+  targetGrade: { min: 6, max: 10 },  // 6th-10th grade reading level
+  warnOnly: true,                     // warn but don't block
+}
 ```
 
-## GitHub Actions
+| Grade range | Audience |
+|-------------|----------|
+| 5-6 | Broad consumer, very simple |
+| 7-8 | Marketing content (recommended default) |
+| 9-10 | Informed consumers, some technical depth |
+| 11-12 | Professional/technical audience |
+| 13+ | Academic, B2B enterprise |
 
-Copy `templates/github-workflow.yml` to `.github/workflows/auto-blog.yml` in your project. The template includes:
+---
 
-- Cron schedule (matches your `schedule.cron`)
-- Manual trigger with `--batch` and `--dry-run` inputs
-- Commit + push with configurable git identity
-- Vercel deploy with retry logic (swap for Netlify/Cloudflare/GitHub Pages)
-- Telegram notification
+## 🔧 Tech Stack and Architecture
 
-**Required secrets:** `GEMINI_API_KEY`, optionally `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD`, `VERCEL_TOKEN`, `TELEGRAM_BOT_TOKEN`.
+### Runtime Dependency
 
-## Environment Variables
+| Package | Purpose |
+|---------|---------|
+| `@google/generative-ai` (^0.21.0) | Gemini API client for text, image, and Google Search grounding |
 
-| Variable | Required | Used by |
-|----------|----------|---------|
-| `GEMINI_API_KEY` | Yes | All Gemini calls (research, write, humanize, translate, image) |
-| `DATAFORSEO_LOGIN` | If `seo.enabled` | Keyword research |
-| `DATAFORSEO_PASSWORD` | If `seo.enabled` | Keyword research |
-| `TELEGRAM_BOT_TOKEN` | No | Notifications (via workflow) |
+**That's it.** One dependency. Everything else uses Node.js built-ins (`fetch`, `fs`, `path`, `url`).
 
-## Batch Mode
+### External APIs
 
-Generate multiple posts in one run. Useful for seeding new sites.
+| API | Auth method | What it provides |
+|-----|------------|-----------------|
+| **Gemini API** | API key via SDK | Topic research, writing, humanization, translation, image generation |
+| **DataForSEO REST API** | Basic auth (login:password) | Keyword volumes, difficulty, related keywords, SERP competitors, PAA questions |
+
+### Models Used
+
+| Model | Used for | Configurable via |
+|-------|----------|-----------------|
+| `gemini-3.1-flash-lite-preview` | All text generation | `config.models.text` |
+| `gemini-2.5-flash-image` | Cover image generation | `config.models.image` |
+
+### Module Map
+
+```
+bin/autoblog.mjs ─── CLI entry point (parses --dry-run, --batch, --config flags)
+        │
+        ▼
+lib/pipeline.mjs ─── Orchestrates 9 steps in sequence
+        │
+        ├── lib/config.mjs ──────────── Loads config, merges defaults, validates
+        ├── lib/retry.mjs ───────────── Exponential backoff (rate_limit / network / bad_output / fatal)
+        ├── lib/scheduler.mjs ───────── Content calendar resolution
+        ├── lib/topics.mjs ──────────── Gemini + Google Search topic discovery
+        ├── lib/deduper.mjs ─────────── Semantic deduplication via Gemini
+        ├── lib/keyword-research.mjs ── DataForSEO REST API (4 endpoints)
+        ├── lib/linker.mjs ──────────── Internal linking (keyword-to-slug index)
+        ├── lib/writer.mjs ──────────── Blog post generation with GEO/AEO rules
+        ├── lib/humanizer.mjs ───────── AI pattern removal (Wikipedia-based)
+        ├── lib/validator.mjs ───────── Quality gate + GEO/AEO scoring (0 API calls)
+        ├── lib/readability.mjs ─────── Flesch-Kincaid grade level (0 API calls)
+        ├── lib/image-generator.mjs ─── Cover image via Gemini image model
+        └── lib/translator.mjs ──────── Multi-language with brand name preservation
+```
+
+### DataForSEO Endpoints
+
+| Endpoint | What it returns | Approx. cost |
+|----------|----------------|-------------|
+| `/dataforseo_labs/google/keyword_overview/live` | Search volume + difficulty for seed keywords | ~$0.01 |
+| `/dataforseo_labs/google/related_keywords/live` | Expanded related terms | ~$0.05 |
+| `/dataforseo_labs/google/serp_competitors/live` | Top-ranking domains | ~$0.05 |
+| `/dataforseo_labs/google/keyword_suggestions/live` | Question-format keywords for FAQ | ~$0.05 |
+
+### Design Principles
+
+- **Config-driven**: All project-specific content lives in one config file. No hardcoded product names, URLs, or topic areas in source code.
+- **Stateless**: Reads from disk, writes to disk, exits. No database, no API server. Git is the state store.
+- **Partial success**: If 5/6 translations succeed, saves those 5 and reports the failure. If image generation fails, post continues without an image.
+- **Retry-aware**: Every API call is wrapped in exponential backoff. Rate limits (429) get longer delays. Fatal errors (401/403) are not retried.
+
+---
+
+## 📖 Configuration Reference
+
+Full configuration with every option: [`autoblog.config.example.mjs`](./autoblog.config.example.mjs)
+
+### Quick reference of all config sections
+
+| Section | What it controls | Required? |
+|---------|-----------------|-----------|
+| `product` | Product name, URL, description, features, tone, brand names | Yes |
+| `authors` | Author roster with name, role, image, category assignments | Yes |
+| `topics` | Topic clusters (search queries), regional contexts, recency | Yes |
+| `output` | Post/image directories, body format (html/md/mdx), frontmatter schema, word count, CTA markers | Has defaults |
+| `translation` | Enabled flag, language codes, rate limiting | Has defaults (disabled) |
+| `models` | Gemini model names for text and image | Has defaults |
+| `steps` | Toggle each pipeline step on/off | Has defaults (all on) |
+| `notifications` | Telegram/Slack config | Optional |
+| `retry` | Max attempts, base delay for exponential backoff | Has defaults |
+| `seo` | DataForSEO credentials, location, difficulty/volume thresholds | Has defaults (disabled) |
+| `schedule` | Cron expression, posts per run, content calendar | Has defaults |
+| `readability` | Target Flesch-Kincaid grade range, warn vs. fail | Has defaults |
+
+### Body format options
+
+| Format | Config value | Output | Best for |
+|--------|-------------|--------|----------|
+| HTML | `'html'` | `<article><section><h2><p>` | Next.js, custom rendering |
+| Markdown | `'markdown'` | `## Heading\n\nParagraph` | Hugo, Jekyll, Gatsby, Astro |
+| MDX | `'mdx'` | Markdown + JSX components | MDX-based sites |
+
+---
+
+## 🤖 Running on Autopilot (GitHub Actions)
+
+### Setup
+
+1. Copy the workflow template:
+   ```bash
+   cp templates/github-workflow.yml .github/workflows/auto-blog.yml
+   ```
+
+2. Edit the workflow — search for `<!-- CHANGE -->` comments and update:
+   - Cron schedule (match your `schedule.cron`)
+   - Git committer email (must be authorized by your deploy platform)
+   - Deploy platform config (Vercel by default — swap for Netlify/Cloudflare/GitHub Pages)
+   - Notification config (Telegram chat ID or remove)
+
+3. Add secrets to your GitHub repo (Settings → Secrets → Actions):
+
+| Secret | Required |
+|--------|----------|
+| `GEMINI_API_KEY` | Yes |
+| `DATAFORSEO_LOGIN` | If `seo.enabled` |
+| `DATAFORSEO_PASSWORD` | If `seo.enabled` |
+| `VERCEL_TOKEN` | If deploying to Vercel |
+| `TELEGRAM_BOT_TOKEN` | For notifications |
+
+### Manual trigger
+
+The workflow supports manual execution from the GitHub Actions UI with inputs for `--batch` count and `--dry-run` mode.
+
+### Batch mode for seeding
 
 ```bash
 npx autoblog --batch 10
 ```
 
-Batch mode:
-- Runs the full pipeline N times sequentially
-- Dedupe is cumulative (post 3 knows about posts 1 and 2)
-- Partial failure: if post 3 fails, posts 1-2 are still saved, pipeline continues to post 4
-- Each post gets its own cover image and translations
+Generates 10 posts sequentially. Deduplication is cumulative (post 3 knows about posts 1 and 2). If post 5 fails, posts 1-4 are still saved and the pipeline continues to post 6.
 
-## Humanization
+---
 
-Every generated post passes through an AI pattern removal step based on [Wikipedia's "Signs of AI writing"](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) guide. The humanizer targets:
+## 🤖 For AI Agents — Setting Up Autoblog in a New Project
 
-- Significance inflation ("pivotal", "testament", "landscape")
-- Promotional language ("boasts", "vibrant", "renowned")
-- AI vocabulary red flags ("delve", "tapestry", "leverage")
-- Structural tells (uniform section lengths, repeated patterns)
-- Hedging and filler ("It's important to note that...")
-- Copula avoidance, synonym cycling, em dash overuse
+This section is written for AI coding agents (Claude Code, Cursor, Windsurf, Copilot, etc.) tasked with implementing the autoblog pipeline in a new codebase. Follow these steps in order.
 
-Disable with `steps.humanize: false` if you prefer raw Gemini output.
+### Information to gather from the user
 
-## Validation
+Before writing any code, get these answers:
 
-The validator runs zero API calls and checks:
+| Question | Maps to config | Example |
+|----------|---------------|---------|
+| What is your product? | `product.name`, `product.url`, `product.description` | "AcmeSaaS, https://acme.com, project management for remote teams" |
+| What are 3-7 key features? | `product.features` | "Async standups, sprint analytics, Slack integration" |
+| What topics should the blog cover? | `topics.clusters` | "Remote work, competitor comparisons, engineering culture" |
+| Who are the author personas? (2+) | `authors` | "Alex Rivera (Engineering Lead), Priya Sharma (Product Analyst)" |
+| What languages should posts be in? | `translation.languages` | "English only" or "English + Spanish + French" |
+| What framework is the site built with? | `output.bodyFormat` | Next.js → `'html'`, Hugo → `'markdown'`, Gatsby/MDX → `'mdx'` |
+| Where do blog posts live in the repo? | `output.postsDir` | `_posts/`, `content/blog/`, `src/posts/` |
+| Where do images live? | `output.imagesDir` | `public/images/blog/`, `static/img/` |
+| Do they have a DataForSEO account? | `seo.enabled` | If no → `false` (pipeline still works) |
+| What is the desired tone? | `product.tone` | "Technical but approachable, never salesy" |
+| Any topics to AVOID? | `product.tone` (add negatives) | "Never mention pricing, don't bash competitors" |
 
-- Word count within `output.wordCount` range
-- All required frontmatter fields present
-- CTA markers present (if configured)
-- Flesch-Kincaid readability grade within target range
-- Internal links point to existing slugs
-- Translation language detection (basic heuristic)
+### Implementation steps
 
-Configure readability targets:
+#### 1. Install the package
 
-```js
-readability: {
-  targetGrade: { min: 6, max: 10 },  // Flesch-Kincaid grade level
-  warnOnly: true,                     // log warning vs. fail pipeline
-}
+```bash
+npm install github:arul-buk/autoblog
 ```
 
-## Body Formats
+#### 2. Create the config file
 
-The writer supports three output formats via `output.bodyFormat`:
-
-| Format | Output | Best for |
-|--------|--------|----------|
-| `html` | `<article><section><h2><p>` | Next.js, custom sites |
-| `markdown` | `## Heading\n\nParagraph` | Jekyll, Hugo, Gatsby |
-| `mdx` | Markdown + JSX components | MDX-based sites |
-
-## Models
+Create `autoblog.config.mjs` in the project root with user-provided values:
 
 ```js
-models: {
-  text: 'gemini-3.1-flash-lite-preview',  // research, write, humanize, translate
-  image: 'gemini-2.5-flash-image',         // cover images only
-}
+export default {
+  product: {
+    name: '',               // from user
+    url: '',                // from user
+    description: '',        // from user
+    features: [],           // from user (array of 'Feature — benefit' strings)
+    cta: { text: 'Get Started Free', url: '' }, // from user
+    tone: '',               // from user (include any "don't" guidance here)
+    brandNames: [],         // product name + any names that shouldn't be translated
+  },
+  authors: [],              // from user (min 2, each needs: name, role, image, categories[])
+  fallbackAuthor: '',       // name of default author
+  topics: {
+    clusters: [],           // from user (each: { name, queries[] })
+  },
+  output: {
+    postsDir: '',           // match project structure
+    imagesDir: '',          // match project structure
+    bodyFormat: '',         // 'html' | 'markdown' | 'mdx' based on framework
+  },
+
+  // Start conservative — enable features incrementally:
+  seo: { enabled: false },
+  translation: { enabled: false },
+  steps: {
+    calendar: false,
+    keywordResearch: false,
+    humanize: true,
+  },
+};
 ```
 
-The text model is used for all text generation. The image model is only used for cover image generation.
+#### 3. Configure the website to render generated posts
 
-## Translation
+The website needs to:
 
-Translates each post to configured languages with partial success handling (if 5/6 succeed, those 5 are saved).
+1. **Read `.md` files** from `output.postsDir` and render frontmatter + body
+2. **Render JSON-LD schema** from `schema` and `qa` frontmatter fields:
 
 ```js
-translation: {
-  enabled: true,
-  languages: ['es', 'pt', 'fr', 'de', 'zh', 'ja'],
-  rateLimitMs: 1000,  // delay between API calls
-}
+// BlogPosting schema
+const blogPostingSchema = {
+  "@context": "https://schema.org",
+  "@type": frontmatter.schema.type,          // "BlogPosting"
+  "headline": frontmatter.schema.headline,
+  "description": frontmatter.schema.description,
+  "wordCount": frontmatter.schema.wordCount,
+  "datePublished": frontmatter.date,
+  "dateModified": frontmatter.lastModified,
+  "author": { "@type": "Person", "name": frontmatter.author },
+  "image": `https://${siteUrl}${frontmatter.coverImage}`,
+};
+
+// FAQPage schema
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": frontmatter.qa.map(item => ({
+    "@type": "Question",
+    "name": item.question,
+    "acceptedAnswer": { "@type": "Answer", "text": item.answer },
+  })),
+};
 ```
 
-Brand names from `product.brandNames` are preserved untranslated.
+3. **Serve cover images** from `output.imagesDir`
+
+#### 4. Test
+
+```bash
+GEMINI_API_KEY=key npx autoblog --dry-run
+```
+
+Verify: config loads → topics discovered → post generated → GEO/AEO score > 70.
+
+#### 5. Generate first real post
+
+```bash
+GEMINI_API_KEY=key npx autoblog
+```
+
+Build the site, verify the post renders with correct schema markup.
+
+#### 6. Set up GitHub Actions (if requested)
+
+Copy `templates/github-workflow.yml` → `.github/workflows/auto-blog.yml`. Update `<!-- CHANGE -->` markers. Add secrets.
+
+### Architecture rules
+
+- **Do not embed pipeline code in the consuming project.** Keep autoblog as a separate package. The config file is the only project-specific artifact.
+- **Do not modify autoblog source files** to customize behavior. Everything is config-driven.
+- **Schema markup is the website's job.** The pipeline outputs frontmatter; the website renders JSON-LD.
+- **Start with budget mode.** Enable DataForSEO and translations after confirming the basic pipeline works.
+- **The pipeline is stateless.** Reads from disk, writes to disk, exits. No database. Git is the state store.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `Config file not found` | Create `autoblog.config.mjs` or use `--config path` |
+| `GEMINI_API_KEY required` | `export GEMINI_API_KEY=your-key` |
+| `seo.apiLogin required` | Set DataForSEO env vars or set `seo.enabled: false` |
+| `All candidate topics already covered` | Add new queries to `topics.clusters` or use calendar with specific topics |
+| GEO/AEO score below 50 | Usually improves on re-run. Try `steps.humanize: false` temporarily to isolate. |
+| Image generation failed | Post saved without image. Non-blocking. Re-run or generate manually. |
+
+---
+
+## Project Structure
+
+```
+autoblog/
+├── bin/
+│   └── autoblog.mjs              # CLI entry point
+├── lib/
+│   ├── config.mjs                 # Config loader + validation
+│   ├── retry.mjs                  # Exponential backoff
+│   ├── scheduler.mjs              # Content calendar
+│   ├── topics.mjs                 # Topic research (Gemini + Google)
+│   ├── deduper.mjs                # Semantic deduplication
+│   ├── keyword-research.mjs       # DataForSEO integration
+│   ├── writer.mjs                 # Post generation (GEO/AEO compliant)
+│   ├── humanizer.mjs              # AI pattern removal
+│   ├── validator.mjs              # Quality gate + GEO/AEO scoring
+│   ├── linker.mjs                 # Internal linking
+│   ├── readability.mjs            # Flesch-Kincaid scoring
+│   ├── translator.mjs             # Multi-language translation
+│   ├── image-generator.mjs        # Cover image generation
+│   └── pipeline.mjs               # 9-step orchestrator
+├── templates/
+│   └── github-workflow.yml        # GitHub Actions template
+├── autoblog.config.example.mjs    # Full config reference
+└── package.json
+```
+
+---
 
 ## License
 
