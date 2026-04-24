@@ -15,15 +15,15 @@ export default {
   // ═══════════════════════════════════════════════════════════════════════════
   product: {
     // [REQUIRED] Product / brand name as it should appear in posts.
-    name: 'WhitelistVideo',
+    name: 'AcmeSaaS',
 
     // [REQUIRED] Primary marketing URL. Used for homepage links in posts.
-    url: 'https://whitelist.video',
+    url: 'https://acme.example.com',
 
     // [REQUIRED] One-sentence description of the product. Injected into
     // the writer system prompt so the LLM understands the product category.
     description:
-      'Parental control for YouTube that lets parents whitelist specific channels their children are allowed to watch.',
+      'Project management tool for remote engineering teams with async standups and sprint analytics.',
 
     // [REQUIRED] Feature list. Each entry is injected verbatim into the
     // writer prompt. Be specific — the LLM uses these to weave product
@@ -31,28 +31,24 @@ export default {
     //
     // FORMAT: "Feature Name — one-sentence description of benefit"
     features: [
-      'Channel Whitelisting — parents pick exactly which YouTube channels kids can watch. Everything else is blocked.',
-      'Shorts Blocking — completely blocks YouTube Shorts (the most addictive feature) while keeping long-form educational content.',
-      'Works on All Devices — browser extension for Desktop/Chromebook, iOS app, Android app. Same whitelist syncs everywhere.',
-      'Auto-pilot Mode — set category rules (e.g., "allow educational, block gaming") and Auto-pilot screens every video automatically.',
-      'Bypass-Proof — unlike Restricted Mode (bypassed in 10 seconds), enforces at browser/device level with incognito detection and VPN blocking.',
-      'No Account Needed — works without YouTube accounts.',
-      'Request System — kids can request new channels. Parents approve/deny from their phone.',
+      'Async Standups — automated daily standups that work across time zones without scheduling meetings.',
+      'Sprint Analytics — track velocity, burndown, and cycle time without manual calculation.',
+      'Slack Integration — create and manage tasks directly from Slack without context switching.',
     ],
 
     // Call-to-action button used in mid-article and conclusion CTAs.
     cta: {
       text: 'Get Started Free',
-      url: 'https://app.whitelist.video',
+      url: 'https://app.acme.example.com',
     },
 
     // Tone guidance injected into the writer prompt.
     // Keep it short — one sentence is usually enough.
-    tone: 'Helpful and educational, not salesy. Position as practical solution to the specific problem discussed.',
+    tone: 'Technical but approachable. Write for engineering managers, not executives.',
 
     // Brand names that must NEVER be translated. The translator module
     // injects these as "keep as-is" instructions.
-    brandNames: ['WhitelistVideo', 'YouTube', 'Google Family Link'],
+    brandNames: ['AcmeSaaS'],
 
     // ─── STYLE GUIDE (optional) ───────────────────────────────────────
     //
@@ -104,38 +100,26 @@ export default {
   authors: [
     {
       // Display name used in frontmatter and byline.
-      name: 'Dr. Rachel Thornton',
+      name: 'Alex Rivera',
       // Short title/role shown below the name.
-      role: 'Child Development Psychologist',
+      role: 'Engineering Lead',
       // Path to author headshot (relative to your site's public dir).
-      image: '/images/authors/rachel-thornton.png',
+      image: '/images/authors/alex-rivera.png',
       // Topic categories this author is best suited for.
       // The pipeline fuzzy-matches the topic's category against these strings.
-      categories: ['Psychology', 'Addiction', 'Parent Concerns'],
+      categories: ['Remote Work', 'Engineering Culture'],
     },
     {
-      name: 'Marcus Chen',
-      role: 'Cybersecurity Engineer',
-      image: '/images/authors/marcus-chen.png',
-      categories: ['Security', 'Bypass', 'Competitor'],
-    },
-    {
-      name: 'Dr. Jennifer Walsh',
-      role: 'Digital Literacy Educator',
-      image: '/images/authors/jennifer-walsh.png',
-      categories: ['Education', 'Guides', 'Platform Updates'],
-    },
-    {
-      name: 'Sarah Mitchell',
-      role: 'Consumer Technology Analyst',
-      image: '/images/authors/sarah-mitchell.png',
-      categories: ['YouTube Safety', 'Platform Updates', 'Competitor'],
+      name: 'Priya Sharma',
+      role: 'Product Analyst',
+      image: '/images/authors/priya-sharma.png',
+      categories: ['Competitor', 'Product', 'Platform Updates'],
     },
   ],
 
   // Fallback author name (must match one of the names above).
   // Used when no author's categories match the topic.
-  fallbackAuthor: 'Sarah Mitchell',
+  fallbackAuthor: 'Alex Rivera',
 
   // ═══════════════════════════════════════════════════════════════════════════
   // TOPIC RESEARCH — controls how the pipeline discovers trending topics.
@@ -156,45 +140,27 @@ export default {
     //   - Include competitor names if you write comparison content
     clusters: [
       {
-        name: 'Regulation',
+        name: 'Remote Work',
         queries: [
-          'YouTube child safety regulation 2026',
-          'social media age verification law',
-          'COPPA enforcement update',
-          'kids online safety act update',
-        ],
-      },
-      {
-        name: 'YouTube Safety',
-        queries: [
-          'YouTube kids safety settings update',
-          'parental control bypass YouTube',
-          'YouTube restricted mode effectiveness',
-          'YouTube algorithm children content',
+          'remote team management challenges {year}',
+          'async communication best practices',
+          'remote engineering team productivity',
         ],
       },
       {
         name: 'Competitor',
         queries: [
-          'Bark parental control review 2026',
-          'Qustodio YouTube filtering',
-          'best parental control app comparison',
+          'best project management tool review {year}',
+          'Jira alternative for remote teams',
+          'Linear vs Asana comparison',
         ],
       },
       {
-        name: 'Parent Concerns',
+        name: 'Engineering Culture',
         queries: [
-          'children screen time research 2026',
-          'YouTube addiction children study',
-          'cyberbullying prevention parents guide',
-        ],
-      },
-      {
-        name: 'Platform Updates',
-        queries: [
-          'YouTube policy update children',
-          'YouTube Shorts algorithm change',
-          'Google Family Link update 2026',
+          'sprint retrospective techniques',
+          'engineering team burnout prevention',
+          'developer experience metrics {year}',
         ],
       },
     ],
@@ -204,9 +170,8 @@ export default {
     //
     // OPTIONAL — omit or set to [] to skip regional diversity.
     regionalContexts: [
-      { region: 'United States', focus: 'KOSA legislation, school Chromebook safety' },
-      { region: 'Australia', focus: 'Under-16 social media ban, eSafety Commissioner' },
-      { region: 'European Union', focus: 'Digital Services Act, age verification' },
+      { region: 'United States', focus: 'tech layoffs, return-to-office mandates' },
+      { region: 'Europe', focus: 'GDPR implications for project management tools' },
     ],
 
     // Only consider content from the last N days when researching topics.
@@ -274,7 +239,7 @@ export default {
     // The consuming website replaces these with interactive components.
     //
     // Set to [] if you don't use CTA markers.
-    ctaMarkers: ['cta:side-by-side', 'cta:quiz-sampler', 'cta:archetype-grid'],
+    ctaMarkers: [],
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -305,7 +270,7 @@ export default {
   // Image model is used for: cover image generation.
   // ═══════════════════════════════════════════════════════════════════════════
   models: {
-    text: 'gemini-3.1-flash-lite-preview',
+    text: 'gemini-2.5-flash',
     image: 'gemini-2.5-flash-image',
   },
 
@@ -356,11 +321,16 @@ export default {
   //
   // Currently supports Telegram. Slack support planned.
   // Omit or set to {} to disable notifications.
+  //
+  // TELEGRAM SETUP:
+  //   1. Message @BotFather on Telegram → /newbot → save the token
+  //   2. Message @userinfobot to get your chat ID
+  //   3. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID env vars
   // ═══════════════════════════════════════════════════════════════════════════
   notifications: {
     telegram: {
       botToken: process.env.TELEGRAM_BOT_TOKEN,
-      chatId: '402486461',
+      chatId: process.env.TELEGRAM_CHAT_ID,
     },
     // slack: {
     //   webhookUrl: process.env.SLACK_WEBHOOK,
@@ -567,7 +537,7 @@ export default {
     //   Full control — topic + keywords + notes:
     //     {
     //       date: '2026-05-08',
-    //       topic: 'Qustodio vs WhitelistVideo: YouTube Filtering Compared',
+    //       topic: 'Linear vs AcmeSaaS: Feature Comparison',
     //       category: 'Competitor',
     //       keywords: ['qustodio alternative', 'best youtube parental control'],
     //       notes: 'Position as objective comparison. Acknowledge strengths.',

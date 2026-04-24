@@ -21,14 +21,32 @@
   "engines": {
     "node": ">=20.0.0"
   },
+  "files": [
+    "bin/",
+    "lib/",
+    "templates/",
+    "autoblog.config.example.mjs",
+    "LICENSE",
+    "README.md"
+  ],
   "keywords": [
     "blog",
     "automation",
     "seo",
     "content-pipeline",
-    "gemini"
+    "gemini",
+    "ai",
+    "content-generation",
+    "dataforseo"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arul-buk/autoblog.git"
+  },
+  "homepage": "https://github.com/arul-buk/autoblog#readme",
+  "bugs": {
+    "url": "https://github.com/arul-buk/autoblog/issues"
+  },
   "author": "StayBoba",
-  "license": "UNLICENSED",
-  "private": true
+  "license": "MIT"
 }

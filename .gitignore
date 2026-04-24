@@ -1,5 +1,7 @@
 node_modules/
 .env
 *.log
+*.tgz
 .DS_Store
+autoblog.config.mjs
 TravelAIAgent/

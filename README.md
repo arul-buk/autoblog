@@ -54,7 +54,13 @@ Built for SaaS companies, content teams, and agencies that want a repeatable, qu
 
 ## 🚀 Setup (5 Minutes)
 
-### Step 1 — Get the code
+### Step 1 — Install
+
+```bash
+npm install @stayboba/autoblog
+```
+
+Or clone the repo directly:
 
 ```bash
 git clone https://github.com/arul-buk/autoblog.git
@@ -552,7 +558,7 @@ readability: {
 
 | Model | Used for | Configurable via |
 |-------|----------|-----------------|
-| `gemini-3.1-flash-lite-preview` | All text generation | `config.models.text` |
+| `gemini-2.5-flash` | All text generation | `config.models.text` |
 | `gemini-2.5-flash-image` | Cover image generation | `config.models.image` |
 
 ### Module Map
@@ -672,6 +678,7 @@ Full configuration with every option: [`autoblog.config.example.mjs`](./autoblog
 | `DATAFORSEO_PASSWORD` | If `seo.enabled` |
 | `VERCEL_TOKEN` | If deploying to Vercel |
 | `TELEGRAM_BOT_TOKEN` | For notifications |
+| `TELEGRAM_CHAT_ID` | For notifications |
 
 ### Manual trigger
 
@@ -714,7 +721,7 @@ Before writing any code, get these answers:
 #### 1. Install the package
 
 ```bash
-npm install github:arul-buk/autoblog
+npm install @stayboba/autoblog
 ```
 
 #### 2. Create the config file
@@ -863,4 +870,4 @@ autoblog/
 
 ## License
 
-UNLICENSED (private/internal use)
+MIT - see [LICENSE](./LICENSE)

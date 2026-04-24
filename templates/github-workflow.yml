@@ -15,6 +15,7 @@
 #   DATAFORSEO_LOGIN      — DataForSEO login (optional, only if seo.enabled)
 #   DATAFORSEO_PASSWORD   — DataForSEO password (optional, only if seo.enabled)
 #   TELEGRAM_BOT_TOKEN    — Telegram bot token (optional, for notifications)
+#   TELEGRAM_CHAT_ID      — Telegram chat ID (optional, for notifications)
 #   VERCEL_TOKEN          — Vercel deploy token (optional, if using Vercel)
 #
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -168,12 +169,12 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
-          # <!-- CHANGE --> Set your Telegram chat ID.
-          CHAT_ID="402486461"
+          # <!-- CHANGE --> Set your Telegram chat ID (from @userinfobot on Telegram).
+          CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
 
           SLUG=$(git log -1 --pretty=%s | sed 's/feat(blog): auto-publish //')
           # <!-- CHANGE --> Set your site URL.
-          POST_URL="https://whitelist.video/blog/${SLUG}"
+          POST_URL="https://your-site.example.com/blog/${SLUG}"
 
           curl -s -X POST \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
