@@ -1,0 +1,182 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# @stayboba/autoblog — GitHub Actions Workflow Template
+#
+# Copy this file to .github/workflows/auto-blog.yml in your project.
+# Customise the values marked with <!-- CHANGE --> comments.
+#
+# PREREQUISITES:
+#   1. Repository secrets configured (see SECRETS section below)
+#   2. autoblog.config.mjs in your project root
+#   3. @stayboba/autoblog installed (npm install or local link)
+#   4. Git user email must match your deploy platform's allowed committers
+#
+# SECRETS REQUIRED:
+#   GEMINI_API_KEY        — Google Gemini API key (required)
+#   DATAFORSEO_LOGIN      — DataForSEO login (optional, only if seo.enabled)
+#   DATAFORSEO_PASSWORD   — DataForSEO password (optional, only if seo.enabled)
+#   TELEGRAM_BOT_TOKEN    — Telegram bot token (optional, for notifications)
+#   VERCEL_TOKEN          — Vercel deploy token (optional, if using Vercel)
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name: Auto Blog Pipeline
+
+on:
+  schedule:
+    # <!-- CHANGE --> Cron schedule. Must match schedule.cron in your config.
+    # See autoblog.config.example.mjs for cron examples.
+    - cron: '17 8 */3 * *'
+
+  # Allow manual triggering from GitHub Actions UI.
+  workflow_dispatch:
+    inputs:
+      batch:
+        description: 'Number of posts to generate (default: 1)'
+        required: false
+        default: '1'
+      dry_run:
+        description: 'Dry run (no files written, no deploy)'
+        required: false
+        type: boolean
+        default: false
+
+# Prevent concurrent runs — each run modifies files and pushes commits.
+concurrency:
+  group: auto-blog
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    # <!-- CHANGE --> Adjust timeout based on your pipeline config.
+    # Full pipeline with 6 translations: ~20-25 min per post.
+    # Budget mode (no translate, no keyword research): ~5 min per post.
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full history needed for deduplication against existing posts.
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ─── Run the pipeline ──────────────────────────────────────────────
+      - name: Generate blog post(s)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # <!-- CHANGE --> Remove these if seo.enabled is false in your config.
+          DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
+          DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}
+        run: |
+          BATCH="${{ github.event.inputs.batch || '1' }}"
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+
+          CMD="npx autoblog --batch $BATCH"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            CMD="$CMD --dry-run"
+          fi
+
+          echo "Running: $CMD"
+          $CMD
+
+      # ─── Commit and push ───────────────────────────────────────────────
+      - name: Commit generated content
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          # <!-- CHANGE --> Set to your deploy platform's allowed committer.
+          git config user.name "Auto Blog Bot"
+          git config user.email "your-email@example.com"
+
+          git add _posts/ public/images/blog/
+
+          # Check if there are changes to commit
+          if git diff --cached --quiet; then
+            echo "No new content generated. Skipping commit."
+            exit 0
+          fi
+
+          # Extract the slug from the most recent post for the commit message
+          SLUG=$(git diff --cached --name-only | grep '_posts/en/' | head -1 | sed 's|_posts/en/||;s|\.md||')
+          git commit -m "feat(blog): auto-publish ${SLUG:-new-post}"
+          git push
+
+      # ─── Deploy (Vercel example) ───────────────────────────────────────
+      # <!-- CHANGE --> Replace this section with your deploy platform.
+      # Options: Vercel, Netlify, Cloudflare Pages, GitHub Pages, etc.
+      #
+      # VERCEL DEPLOYMENT:
+      #   Requires VERCEL_TOKEN secret and org/project IDs.
+      #   Get these from: vercel link (in your project)
+      #
+      # NETLIFY DEPLOYMENT:
+      #   Replace with: netlify deploy --prod --auth $NETLIFY_AUTH_TOKEN
+      #
+      # GITHUB PAGES:
+      #   Replace with the actions/deploy-pages action.
+      #
+      # CLOUDFLARE PAGES:
+      #   Replace with: npx wrangler pages deploy
+      #
+      - name: Deploy to Vercel
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          # <!-- CHANGE --> Set your Vercel org and project IDs.
+          # Find these by running: vercel link
+          VERCEL_ORG_ID="your-org-id"
+          VERCEL_PROJECT_ID="your-project-id"
+
+          # Retry logic for transient Vercel errors
+          MAX_RETRIES=3
+          RETRY_DELAY=300  # 5 minutes
+
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            echo "Deploy attempt $attempt of $MAX_RETRIES..."
+
+            DEPLOY_OUTPUT=$(npx vercel deploy --prod --yes \
+              --token "$VERCEL_TOKEN" \
+              --scope "$VERCEL_ORG_ID" 2>&1) && break
+
+            echo "Deploy failed: $DEPLOY_OUTPUT"
+
+            if [ $attempt -lt $MAX_RETRIES ]; then
+              echo "Retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+            else
+              echo "All deploy attempts failed."
+              exit 1
+            fi
+          done
+
+          echo "Deploy successful: $DEPLOY_OUTPUT"
+
+      # ─── Notify (Telegram example) ─────────────────────────────────────
+      # <!-- CHANGE --> Remove or replace with your notification system.
+      - name: Notify via Telegram
+        if: ${{ github.event.inputs.dry_run != 'true' && success() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          # <!-- CHANGE --> Set your Telegram chat ID.
+          CHAT_ID="402486461"
+
+          SLUG=$(git log -1 --pretty=%s | sed 's/feat(blog): auto-publish //')
+          # <!-- CHANGE --> Set your site URL.
+          POST_URL="https://whitelist.video/blog/${SLUG}"
+
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="$CHAT_ID" \
+            -d parse_mode="HTML" \
+            -d text="📝 <b>New blog post published</b>%0A%0A<a href=\"${POST_URL}\">${SLUG}</a>"

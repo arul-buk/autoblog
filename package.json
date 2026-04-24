@@ -1,0 +1,34 @@
+{
+  "name": "@stayboba/autoblog",
+  "version": "1.0.0",
+  "description": "Config-driven automated blog content pipeline powered by Gemini + DataForSEO",
+  "type": "module",
+  "bin": {
+    "autoblog": "./bin/autoblog.mjs"
+  },
+  "main": "./lib/pipeline.mjs",
+  "exports": {
+    ".": "./lib/pipeline.mjs",
+    "./config": "./lib/config.mjs"
+  },
+  "scripts": {
+    "start": "node bin/autoblog.mjs",
+    "dry-run": "node bin/autoblog.mjs --dry-run"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "blog",
+    "automation",
+    "seo",
+    "content-pipeline",
+    "gemini"
+  ],
+  "author": "StayBoba",
+  "license": "UNLICENSED",
+  "private": true
+}
