@@ -82,6 +82,14 @@ Open `autoblog.config.mjs` and fill in three sections (explained in detail in th
 
 ### Step 3 — Set your API key
 
+Create a `.env` file in your project root (loaded automatically):
+
+```bash
+GEMINI_API_KEY=your-gemini-api-key
+```
+
+Or export directly:
+
 ```bash
 export GEMINI_API_KEY="your-gemini-api-key"
 ```
@@ -89,9 +97,10 @@ export GEMINI_API_KEY="your-gemini-api-key"
 ### Step 4 — Run it
 
 ```bash
-npx autoblog --dry-run    # preview without saving files (recommended first time)
-npx autoblog              # generate and save one blog post
-npx autoblog --batch 5    # generate 5 posts at once (for seeding a new blog)
+npx autoblog --help        # see all options
+npx autoblog --dry-run     # preview without saving files (recommended first time)
+npx autoblog               # generate and save one blog post
+npx autoblog --batch 5     # generate 5 posts at once (for seeding a new blog)
 ```
 
 ### What you get
@@ -651,6 +660,41 @@ Full configuration with every option: [`autoblog.config.example.mjs`](./autoblog
 | HTML | `'html'` | `<article><section><h2><p>` | Next.js, custom rendering |
 | Markdown | `'markdown'` | `## Heading\n\nParagraph` | Hugo, Jekyll, Gatsby, Astro |
 | MDX | `'mdx'` | Markdown + JSX components | MDX-based sites |
+
+### Astro content collections
+
+Autoblog generates standard `.md` files with YAML frontmatter — compatible with Astro's content collections. Set `bodyFormat: 'markdown'` and define a matching Zod schema in your `src/content.config.ts`:
+
+```ts
+import { defineCollection, z } from 'astro:content';
+import { glob } from 'astro/loaders';
+
+const blog = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/blog' }),
+  schema: z.object({
+    title: z.string(),
+    date: z.string(),
+    excerpt: z.string(),
+    coverImage: z.string(),
+    author: z.string(),
+    category: z.string(),
+    tags: z.array(z.string()),
+    seoKeywords: z.string(),
+    qa: z.array(z.object({ question: z.string(), answer: z.string() })),
+    schema: z.object({
+      type: z.string(),
+      headline: z.string(),
+      description: z.string(),
+      wordCount: z.number(),
+      keywords: z.string().optional(),
+    }),
+  }),
+});
+
+export const collections = { blog };
+```
+
+Set `output.postsDir` to your Astro content directory (e.g., `src/content/blog`).
 
 ---
 
