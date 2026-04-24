@@ -31,7 +31,7 @@ Built for SaaS companies, content teams, and agencies that want a repeatable, qu
 | **Gemini API key** | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | Yes | Free tier available; paid for heavy usage |
 | **DataForSEO account** | [app.dataforseo.com/register](https://app.dataforseo.com/register) | Optional | ~$0.04-0.20 per post for real keyword data |
 
-> **Without DataForSEO:** The pipeline still works. Gemini picks keywords on its own. Results are decent but not data-driven. You can start without it and add it later.
+> **Without DataForSEO:** The pipeline still works. Gemini runs an intelligent keyword strategy — analyzing your topic against existing blog posts to find keyword gaps and suggest seed keywords. You get gap-aware keyword guidance, just without search volume numbers. You can add DataForSEO later for data-driven enrichment.
 
 ### Technical Requirements
 
@@ -46,8 +46,8 @@ Built for SaaS companies, content teams, and agencies that want a repeatable, qu
 
 | Pipeline mode | What's included | Cost |
 |---------------|----------------|------|
-| **Full pipeline** (6 translations) | Research + keywords + write + humanize + image + 6 translations | ~$0.12-0.17 |
-| **English + polished** | Research + keywords + write + humanize + image | ~$0.05 |
+| **Full pipeline** (6 translations) | Research + keyword strategy + DataForSEO + write + humanize + image + 6 translations | ~$0.12-0.17 |
+| **English + polished** | Research + keyword strategy + write + humanize + image | ~$0.05 |
 | **Budget mode** | Research + write + image only | ~$0.02-0.04 |
 
 ---
@@ -402,14 +402,14 @@ schedule: {
 9 steps, executed in sequence. Each step can be turned on or off independently.
 
 ```
-┌──────────┐   ┌──────────┐   ┌─────────┐   ┌───────────┐   ┌─────────┐
-│ Schedule │──>│ Research  │──>│ Dedupe  │──>│ Keywords  │──>│  Write  │
-│ (calendar)│   │ (Gemini+  │   │ (Gemini │   │(DataForSEO)│   │(Gemini) │
-│          │   │  Google)  │   │semantic)│   │           │   │         │
-└──────────┘   └──────────┘   └─────────┘   └───────────┘   └────┬────┘
-                                                                   │
-┌──────────┐   ┌──────────┐   ┌──────────┐   ┌───────────┐        │
-│Translate │<──│  Image   │<──│ Validate │<──│ Humanize  │<───────┘
+┌──────────┐   ┌──────────┐   ┌─────────┐   ┌─────────────┐   ┌─────────┐
+│ Schedule │──>│ Research  │──>│ Dedupe  │──>│  Keywords   │──>│  Write  │
+│ (calendar)│   │ (Gemini+  │   │ (Gemini │   │(Gemini+DFSEO)│   │(Gemini) │
+│          │   │  Google)  │   │semantic)│   │             │   │         │
+└──────────┘   └──────────┘   └─────────┘   └─────────────┘   └────┬────┘
+                                                                     │
+┌──────────┐   ┌──────────┐   ┌──────────┐   ┌───────────┐          │
+│Translate │<──│  Image   │<──│ Validate │<──│ Humanize  │<─────────┘
 │(Gemini×N)│   │ (Gemini) │   │ (local)  │   │ (Gemini)  │
 └──────────┘   └──────────┘   └──────────┘   └───────────┘
 ```
@@ -425,6 +425,27 @@ schedule: {
 | 7 | **Validate** | Local quality check: word count, frontmatter fields, readability score, GEO/AEO compliance score. Zero API calls. | 0 | `steps.validate` |
 | 8 | **Image** | Gemini generates a 16:9 conceptual cover illustration. Saves as PNG. | 1 | `steps.image` |
 | 9 | **Translate** | Translates to each configured language. Brand names preserved. Partial success: saves what succeeds. | N | `steps.translate` |
+
+### How the Keyword Step Works
+
+The keyword step has two layers:
+
+**Layer 1 — Gemini Keyword Strategy (always runs)**
+
+Gemini receives the selected topic + metadata from all existing blog posts (titles, keywords) + your SEO constraints from config. It returns:
+
+- **Primary seed keywords** — 3-5 specific phrases to research
+- **Question keywords** — 2-3 question-format keywords for FAQ sections
+- **Gap analysis** — what keyword gap this post fills vs existing content
+- **Avoid keywords** — keywords the blog already covers (prevents cannibalization)
+
+This replaces naive string-splitting of the topic title. The output is gap-aware and considers your entire blog history.
+
+**Layer 2 — DataForSEO Enrichment (only when `seo.enabled: true`)**
+
+The Gemini-selected seeds are sent to DataForSEO for real search volume, difficulty scores, related terms, SERP competitors, and People Also Ask questions. This data-driven layer adds volume/difficulty numbers to guide the writer's keyword density and FAQ section.
+
+**When DataForSEO is unavailable:** The writer still gets the Gemini keyword strategy output — gap-aware keyword guidance with `null` volume/difficulty. The writer uses these keywords naturally without density targets.
 
 ---
 
@@ -524,7 +545,7 @@ readability: {
 
 | API | Auth method | What it provides |
 |-----|------------|-----------------|
-| **Gemini API** | API key via SDK | Topic research, writing, humanization, translation, image generation |
+| **Gemini API** | API key via SDK | Topic research, keyword strategy, writing, humanization, translation, image generation |
 | **DataForSEO REST API** | Basic auth (login:password) | Keyword volumes, difficulty, related keywords, SERP competitors, PAA questions |
 
 ### Models Used
@@ -568,9 +589,28 @@ lib/pipeline.mjs ─── Orchestrates 9 steps in sequence
 | `/dataforseo_labs/google/serp_competitors/live` | Top-ranking domains | ~$0.05 |
 | `/dataforseo_labs/google/keyword_suggestions/live` | Question-format keywords for FAQ | ~$0.05 |
 
+### Prompt Architecture
+
+All 9 Gemini prompt builders are consolidated in a single file: `lib/prompts.mjs`. This is a pure-function module with zero imports from other lib files — each function takes a destructured object and returns a string.
+
+| Function | Used by | Purpose |
+|----------|---------|---------|
+| `buildResearchPrompt` | topics.mjs | Topic discovery via Google Search grounding |
+| `buildDedupePrompt` | deduper.mjs | Semantic deduplication against existing posts |
+| `buildKeywordStrategyPrompt` | keyword-research.mjs | Intelligent seed keyword selection + gap analysis |
+| `buildWriterPrompt` | writer.mjs | Full blog post generation with GEO/AEO rules |
+| `buildStyleGuideBlock` | (used by buildWriterPrompt) | Style guide injection into writer prompt |
+| `buildHumanizationPrompt` | humanizer.mjs | AI pattern removal system instruction |
+| `buildHumanizationUserPrompt` | humanizer.mjs | Humanization user message with content |
+| `buildTranslationPrompt` | translator.mjs | Multi-language translation with brand preservation |
+| `buildImagePrompt` | image-generator.mjs | Cover image generation prompt |
+
+To review or update any prompt, edit `lib/prompts.mjs` — no need to search across module files.
+
 ### Design Principles
 
 - **Config-driven**: All project-specific content lives in one config file. No hardcoded product names, URLs, or topic areas in source code.
+- **Prompts in one file**: All Gemini prompts consolidated in `lib/prompts.mjs` for easy review and iteration.
 - **Stateless**: Reads from disk, writes to disk, exits. No database, no API server. Git is the state store.
 - **Partial success**: If 5/6 translations succeed, saves those 5 and reports the failure. If image generation fails, post continues without an image.
 - **Retry-aware**: Every API call is wrapped in exponential backoff. Rate limits (429) get longer delays. Fatal errors (401/403) are not retried.
