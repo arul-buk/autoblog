@@ -50,6 +50,18 @@ export default {
     // injects these as "keep as-is" instructions.
     brandNames: ['AcmeSaaS'],
 
+    // Cover image style directive. Replaces the default "clean minimalist
+    // digital art style" with your brand's visual language.
+    //
+    // EXAMPLES:
+    //   'Swiss Brutalist style, bold black typography, raw concrete textures'
+    //   'Dark mode illustration, neon accents on #0D1117 background'
+    //   'Flat vector illustration, brand colours #FF6B35 and #004E89'
+    //   'Isometric 3D illustration, soft pastel palette, no gradients'
+    //
+    // Omit to use the default (gradient background, minimalist digital art).
+    imageStyle: null,
+
     // ─── STYLE GUIDE (optional) ───────────────────────────────────────
     //
     // Provide brand voice rules and/or a reference blog post to shape
