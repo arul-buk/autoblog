@@ -680,6 +680,8 @@ const blog = defineCollection({
     category: z.string(),
     tags: z.array(z.string()),
     seoKeywords: z.string(),
+    readingTime: z.string().optional(),
+    relatedPosts: z.array(z.string()).optional(),
     qa: z.array(z.object({ question: z.string(), answer: z.string() })),
     schema: z.object({
       type: z.string(),
