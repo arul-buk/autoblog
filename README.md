@@ -337,7 +337,7 @@ topics: {
 
 ### What SEO keywords should it target? → `seo` section
 
-**Without DataForSEO** (`seo.enabled: false`): Gemini picks keywords based on its own judgment. Works fine, but not data-driven.
+**Without DataForSEO** (`seo.enabled: false`): Gemini still runs an intelligent keyword strategy — analyzing your topic against all existing blog posts to find keyword gaps and suggest seed keywords. The writer gets gap-aware keyword guidance, just without volume/difficulty numbers.
 
 **With DataForSEO** (`seo.enabled: true`): The pipeline gets real search volume, keyword difficulty, related terms, and People Also Ask questions before writing. This data is injected into the writer prompt.
 
@@ -419,7 +419,7 @@ schedule: {
 | 1 | **Schedule** | Checks content calendar for today. Uses calendar entry if found, otherwise proceeds to research. | 0 | `steps.calendar` |
 | 2 | **Research** | Searches Google (via Gemini grounding) for trending topics matching your clusters. Returns 10-15 candidates ranked by recency. | 1 | `steps.research` |
 | 3 | **Dedupe** | Sends candidates + all existing post titles to Gemini. Catches semantic duplicates even with different wording. | 1 | `steps.dedupe` |
-| 4 | **Keywords** | Calls DataForSEO: keyword volumes, difficulty, related terms, SERP competitors, People Also Ask. Injects data into writer prompt. | 4 | `steps.keywordResearch` |
+| 4 | **Keywords** | Gemini analyzes topic + existing blog content to find keyword gaps, then calls DataForSEO for volumes, difficulty, related terms, SERP competitors, PAA. When DataForSEO is unavailable, Gemini-only keyword guidance is still provided to the writer. | 1 Gemini + 4 DataForSEO | `steps.keywordResearch` |
 | 5 | **Write** | Gemini generates the full post: YAML frontmatter + HTML/markdown body. Includes product context, keyword data, GEO/AEO rules. | 1 | Always on |
 | 6 | **Humanize** | Second Gemini pass removes AI writing patterns (significance inflation, promotional language, filler, structural tells). | 1 | `steps.humanize` |
 | 7 | **Validate** | Local quality check: word count, frontmatter fields, readability score, GEO/AEO compliance score. Zero API calls. | 0 | `steps.validate` |
@@ -543,11 +543,12 @@ bin/autoblog.mjs ─── CLI entry point (parses --dry-run, --batch, --config 
 lib/pipeline.mjs ─── Orchestrates 9 steps in sequence
         │
         ├── lib/config.mjs ──────────── Loads config, merges defaults, validates
+        ├── lib/prompts.mjs ─────────── All Gemini prompts consolidated (9 prompt builders)
         ├── lib/retry.mjs ───────────── Exponential backoff (rate_limit / network / bad_output / fatal)
         ├── lib/scheduler.mjs ───────── Content calendar resolution
         ├── lib/topics.mjs ──────────── Gemini + Google Search topic discovery
         ├── lib/deduper.mjs ─────────── Semantic deduplication via Gemini
-        ├── lib/keyword-research.mjs ── DataForSEO REST API (4 endpoints)
+        ├── lib/keyword-research.mjs ── Intelligent keyword strategy (Gemini) + DataForSEO (4 endpoints)
         ├── lib/linker.mjs ──────────── Internal linking (keyword-to-slug index)
         ├── lib/writer.mjs ──────────── Blog post generation with GEO/AEO rules
         ├── lib/style-guide.mjs ─────── Style guide resolver (voice + reference post)
@@ -801,7 +802,8 @@ autoblog/
 │   ├── scheduler.mjs              # Content calendar
 │   ├── topics.mjs                 # Topic research (Gemini + Google)
 │   ├── deduper.mjs                # Semantic deduplication
-│   ├── keyword-research.mjs       # DataForSEO integration
+│   ├── keyword-research.mjs       # Intelligent keyword strategy + DataForSEO
+│   ├── prompts.mjs                # All Gemini prompt builders (single source of truth)
 │   ├── writer.mjs                 # Post generation (GEO/AEO compliant)
 │   ├── style-guide.mjs            # Style guide resolver
 │   ├── humanizer.mjs              # AI pattern removal + style matching
