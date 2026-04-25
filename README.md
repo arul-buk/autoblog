@@ -700,6 +700,90 @@ Set `output.postsDir` to your Astro content directory (e.g., `src/content/blog`)
 
 ---
 
+## ⚡ Optional Enhancements
+
+All features below are **opt-in**. Each activates only when its config flag is enabled and/or API credentials are present. If credentials are missing or an API call fails, the feature is silently skipped and the pipeline continues normally.
+
+### GSC-Informed Topic Research
+
+Mines Google Search Console data before trending research to find quick-win keywords (position 4-15), orphan queries (high impressions, no dedicated page), and declining pages that need refreshing.
+
+```js
+// In autoblog.config.mjs
+gsc: {
+  enabled: true,
+  propertyUrl: 'sc-domain:example.com',
+}
+```
+
+**Requires:** `GSC_SERVICE_ACCOUNT_JSON` env var (path to Google service account JSON key file).
+
+### Search Intent Classification
+
+Automatically classifies keywords as informational, commercial, transactional, or navigational. The writer then structures the post to match searcher expectations (how-to guide vs. comparison vs. product tutorial).
+
+**No config needed** — automatically enhances existing keyword research when `steps.keywordResearch: true`.
+
+### Meta Tag Optimization
+
+After writing, generates 3 optimized title variants using different hook strategies (curiosity, benefit, specificity) and picks the highest-scoring one. Also optimizes the meta description to 150-160 characters.
+
+```js
+steps: { metaOptimize: true }
+```
+
+**Cost:** ~$0.001 per post (1 Gemini Flash call).
+
+### Cross-Model Quality Review
+
+Sends the post to a stronger model (Gemini Pro) for quality scoring on factual accuracy, keyword naturalness, tone alignment, and structure. If the score is below threshold, automatically rewrites incorporating the feedback.
+
+```js
+steps: { crossModelReview: true },
+crossModel: {
+  model: 'gemini-2.5-pro',
+  qualityThreshold: 7,
+}
+```
+
+**Cost:** ~$0.02-0.05 per post (1 Gemini Pro call, possibly 1 rewrite).
+
+### Embedded JSON-LD Schema
+
+Generates BlogPosting and FAQPage JSON-LD `<script>` blocks from frontmatter and embeds them directly in the post body. Your site renders the post and gets schema markup for free.
+
+```js
+steps: { embedSchema: true },
+output: { siteUrl: 'https://example.com' }
+```
+
+### Context Persistence (Feedback Loop)
+
+Maintains a `.autoblog-context.json` file that tracks which topics were generated, what keywords were targeted, and (optionally) performance data from GSC and GA4.
+
+```js
+context: { enabled: true },
+// Optional: GA4 performance tracking
+analytics: { enabled: true, propertyId: '123456789' }
+```
+
+**Requires:** `GA4_SERVICE_ACCOUNT_JSON` env var for analytics integration.
+
+### CMS Direct Publishing
+
+After saving files locally, also pushes to your CMS via REST API. Supports WordPress, Ghost, Webflow, Strapi, and Contentful.
+
+```js
+publish: {
+  cms: 'wordpress',  // or 'ghost', 'webflow', 'strapi', 'contentful'
+  draft: true,       // publish as draft
+}
+```
+
+**Auth via env vars** — see the secrets table in the GitHub Actions section below.
+
+---
+
 ## 🤖 Running on Autopilot (GitHub Actions)
 
 ### Setup
@@ -722,6 +806,14 @@ Set `output.postsDir` to your Astro content directory (e.g., `src/content/blog`)
 | `GEMINI_API_KEY` | Yes |
 | `DATAFORSEO_LOGIN` | If `seo.enabled` |
 | `DATAFORSEO_PASSWORD` | If `seo.enabled` |
+| `GSC_SERVICE_ACCOUNT_JSON` | If `gsc.enabled` (GSC topic mining) |
+| `GA4_SERVICE_ACCOUNT_JSON` | If `analytics.enabled` (GA4 performance tracking) |
+| `CMS_ENDPOINT` | If `publish.cms` is set |
+| `CMS_USERNAME` / `CMS_PASSWORD` | WordPress publishing |
+| `CMS_ADMIN_API_KEY` | Ghost publishing (id:secret format) |
+| `CMS_API_TOKEN` | Webflow/Strapi/Contentful publishing |
+| `CMS_COLLECTION_ID` | Webflow publishing |
+| `CMS_SPACE_ID` | Contentful publishing |
 | `VERCEL_TOKEN` | If deploying to Vercel |
 | `TELEGRAM_BOT_TOKEN` | For notifications |
 | `TELEGRAM_CHAT_ID` | For notifications |
@@ -782,6 +874,14 @@ Before doing anything, ask me ALL of the following questions at once (not one by
     dark backgrounds", "watercolor illustrations", or leave blank for the default minimalist style)
 13. GitHub Actions — Do you want this running automatically on a schedule? If yes, how often?
     (e.g., every 3 days, weekly)
+14. Optional enhancements — Do you want any of these? (all are opt-in, all skip gracefully):
+    a. GSC topic mining — Mine Google Search Console for quick-win keywords (needs service account)
+    b. Meta optimization — CTR-optimize titles with 3 variants (~$0.001/post)
+    c. Cross-model review — Quality check via Gemini Pro (~$0.02-0.05/post)
+    d. Embedded JSON-LD — Embed BlogPosting + FAQPage schema in post body
+    e. Context persistence — Track posts + performance across runs
+    f. GA4 analytics — Pull pageview/engagement data (needs service account)
+    g. CMS publishing — Push to WordPress, Ghost, Webflow, Strapi, or Contentful
 
 STEP 2: INSTALL AND CONFIGURE
 
@@ -814,6 +914,11 @@ STEP 4: SET UP GITHUB ACTIONS (if requested)
 3. Tell me what GitHub repository secrets I need to add:
    - GEMINI_API_KEY (required)
    - DATAFORSEO_LOGIN, DATAFORSEO_PASSWORD (if using DataForSEO)
+   - GSC_SERVICE_ACCOUNT_JSON (if using GSC topic mining)
+   - GA4_SERVICE_ACCOUNT_JSON (if using GA4 analytics)
+   - CMS_ENDPOINT, CMS_USERNAME, CMS_PASSWORD (if publishing to WordPress)
+   - CMS_ENDPOINT, CMS_ADMIN_API_KEY (if publishing to Ghost)
+   - CMS_API_TOKEN, CMS_COLLECTION_ID (if publishing to Webflow)
    - TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (if you want Telegram notifications)
 
 STEP 5: VERIFY SITE RENDERS THE POSTS
@@ -910,9 +1015,13 @@ autoblog/
 │   ├── readability.mjs            # Flesch-Kincaid scoring
 │   ├── translator.mjs             # Multi-language translation
 │   ├── image-generator.mjs        # Cover image generation
-│   └── pipeline.mjs               # 9-step orchestrator
-├── templates/
-│   └── github-workflow.yml        # GitHub Actions template
+│   ├── gsc.mjs                    # Google Search Console mining (optional)
+│   ├── meta-optimizer.mjs         # CTR title optimization (optional)
+│   ├── cross-reviewer.mjs         # Cross-model quality review (optional)
+│   ├── schema-embedder.mjs        # JSON-LD embedding (optional)
+│   ├── context.mjs                # Context persistence + GA4 (optional)
+│   ├── publisher.mjs              # CMS publishing — 5 adapters (optional)
+│   └── pipeline.mjs               # 16-step orchestrator
 ├── autoblog.config.example.mjs    # Full config reference
 └── package.json
 ```

@@ -252,6 +252,10 @@ export default {
     //
     // Set to [] if you don't use CTA markers.
     ctaMarkers: [],
+
+    // Site URL — required when steps.embedSchema is enabled.
+    // Used to generate canonical URLs in JSON-LD schema markup.
+    // siteUrl: 'https://example.com',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -319,10 +323,13 @@ export default {
     calendar: true,          // Check content calendar before research
     research: true,          // Gemini + Google Search topic discovery
     dedupe: true,            // Semantic deduplication against existing posts
-    keywordResearch: true,   // DataForSEO keyword enrichment
+    keywordResearch: true,   // DataForSEO keyword enrichment + intent classification
     write: true,             // Gemini content generation (always runs)
+    metaOptimize: false,     // CTR-optimized titles and descriptions (1 extra Gemini call)
     humanize: true,          // AI pattern removal pass
+    crossModelReview: false, // Quality review via Gemini Pro (~$0.02-0.05/post)
     validate: true,          // Post-generation quality checks
+    embedSchema: false,      // Embed JSON-LD (BlogPosting + FAQPage) in post body
     internalLinking: true,   // Cross-link to existing posts
     image: true,             // Cover image generation
     translate: true,         // Multi-language translation
@@ -597,6 +604,88 @@ export default {
     calendar: [],
     calendarFile: null,
   },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GOOGLE SEARCH CONSOLE — data-driven topic research (optional).
+  //
+  // Mines GSC data before trending research to find:
+  //   - Quick wins (position 4-15 keywords with decent impressions)
+  //   - Orphan queries (impressions but no dedicated page)
+  //   - Declining pages (>30% click drop, need refreshing)
+  //
+  // SETUP:
+  //   1. Create a Google Cloud service account with Search Console access
+  //   2. Set GSC_SERVICE_ACCOUNT_JSON env var to the JSON key file path
+  //   3. Add your property URL below
+  //
+  // Skipped silently if credentials are missing.
+  // ═══════════════════════════════════════════════════════════════════════════
+  // gsc: {
+  //   enabled: false,                    // auto-enables if GSC_SERVICE_ACCOUNT_JSON is set
+  //   propertyUrl: 'sc-domain:example.com',
+  //   lookbackDays: 90,
+  //   quickWinPositionRange: [4, 15],
+  //   minImpressions: 50,
+  // },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CMS PUBLISHING — push posts to CMS platforms (optional).
+  //
+  // After saving files locally, also publishes to your CMS via REST API.
+  // Supports: WordPress, Ghost, Webflow, Strapi, Contentful.
+  //
+  // SETUP (WordPress example):
+  //   1. Set CMS_ENDPOINT='https://myblog.com/wp-json/wp/v2'
+  //   2. Set CMS_USERNAME and CMS_PASSWORD (application password)
+  //   3. Set publish.cms = 'wordpress' below
+  //
+  // See README for env vars required by each CMS.
+  // ═══════════════════════════════════════════════════════════════════════════
+  // publish: {
+  //   cms: null,           // 'wordpress' | 'ghost' | 'webflow' | 'strapi' | 'contentful' | null
+  //   draft: true,         // publish as draft (true) or live (false)
+  // },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CONTEXT PERSISTENCE — performance feedback loop (optional).
+  //
+  // Tracks generated posts, keywords, and (optionally) performance data
+  // across pipeline runs in a local JSON file. Helps avoid repeating
+  // underperforming topics and reinforces successful patterns.
+  // ═══════════════════════════════════════════════════════════════════════════
+  // context: {
+  //   enabled: false,
+  //   filePath: '.autoblog-context.json',
+  // },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GOOGLE ANALYTICS — pageview/engagement tracking (optional).
+  //
+  // When enabled alongside context persistence, fetches GA4 metrics
+  // for previously published posts to track content performance.
+  //
+  // SETUP:
+  //   1. Create a Google Cloud service account with GA4 read access
+  //   2. Set GA4_SERVICE_ACCOUNT_JSON env var to the JSON key file path
+  //   3. Set your GA4 property ID below
+  // ═══════════════════════════════════════════════════════════════════════════
+  // analytics: {
+  //   enabled: false,
+  //   propertyId: '',       // GA4 property ID (e.g., '123456789')
+  // },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CROSS-MODEL REVIEW — quality validation (optional).
+  //
+  // After humanization, sends the post to a stronger model (Gemini Pro)
+  // for quality review. If score is below threshold, rewrites with feedback.
+  //
+  // COST: ~$0.02-0.05 per post (1 Gemini Pro call, possibly 1 rewrite).
+  // ═══════════════════════════════════════════════════════════════════════════
+  // crossModel: {
+  //   model: 'gemini-2.5-pro',       // review model
+  //   qualityThreshold: 7,            // rewrite if score below this
+  // },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // READABILITY TARGET — Flesch-Kincaid grade level check.

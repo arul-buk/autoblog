@@ -72,15 +72,29 @@ Options:
   --help, -h          Show this help message
 
 Environment variables:
-  GEMINI_API_KEY          Gemini API key (required)
-                          Get one at: https://aistudio.google.com/apikey
+  GEMINI_API_KEY              Gemini API key (required)
+                              Get one at: https://aistudio.google.com/apikey
 
-  DATAFORSEO_LOGIN        DataForSEO login (optional, for keyword research)
-  DATAFORSEO_PASSWORD     DataForSEO password
-                          Sign up at: https://app.dataforseo.com/register
+  DATAFORSEO_LOGIN            DataForSEO login (optional, for keyword research)
+  DATAFORSEO_PASSWORD         DataForSEO password
+                              Sign up at: https://app.dataforseo.com/register
 
-  AUTOBLOG_TEXT_MODEL     Override text model (default: gemini-2.5-flash)
-  AUTOBLOG_IMAGE_MODEL    Override image model (default: gemini-2.5-flash-image)
+  GSC_SERVICE_ACCOUNT_JSON    Google service account JSON path or inline
+                              (optional, for GSC topic mining)
+
+  GA4_SERVICE_ACCOUNT_JSON    Google service account JSON path or inline
+                              (optional, for analytics performance tracking)
+
+  CMS_ENDPOINT                CMS API endpoint (optional, for CMS publishing)
+  CMS_USERNAME / CMS_PASSWORD WordPress basic auth
+  CMS_ADMIN_API_KEY           Ghost Admin API key (id:secret format)
+  CMS_API_TOKEN               Webflow/Strapi/Contentful API token
+  CMS_COLLECTION_ID           Webflow collection ID
+  CMS_SPACE_ID                Contentful space ID
+  CMS_CONTENT_TYPE_ID         Strapi/Contentful content type
+
+  AUTOBLOG_TEXT_MODEL         Override text model (default: gemini-2.5-flash)
+  AUTOBLOG_IMAGE_MODEL        Override image model (default: gemini-2.5-flash-image)
 
 Setup:
   1. cp autoblog.config.example.mjs autoblog.config.mjs
