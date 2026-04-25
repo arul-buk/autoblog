@@ -742,77 +742,112 @@ Generates 10 posts sequentially. Deduplication is cumulative (post 3 knows about
 
 ## 🤖 For AI Agents — Setting Up Autoblog in a New Project
 
-This section is written for AI coding agents (Claude Code, Cursor, Windsurf, Copilot, etc.) tasked with implementing the autoblog pipeline in a new codebase. Follow these steps in order.
+Copy the prompt below and give it to your AI coding agent (Claude Code, Cursor, Windsurf, Copilot, etc.) to set up autoblog in your project.
 
-### Information to gather from the user
+### Setup Prompt
 
-Before writing any code, get these answers:
+```
+I want to set up @stayboba/autoblog — an automated blog content pipeline that uses Gemini AI
+to research trending topics, write SEO-optimized blog posts, generate cover images, and
+optionally translate to multiple languages.
 
-| Question | Maps to config | Example |
-|----------|---------------|---------|
-| What is your product? | `product.name`, `product.url`, `product.description` | "AcmeSaaS, https://acme.com, project management for remote teams" |
-| What are 3-7 key features? | `product.features` | "Async standups, sprint analytics, Slack integration" |
-| What topics should the blog cover? | `topics.clusters` | "Remote work, competitor comparisons, engineering culture" |
-| Who are the author personas? (2+) | `authors` | "Alex Rivera (Engineering Lead), Priya Sharma (Product Analyst)" |
-| What languages should posts be in? | `translation.languages` | "English only" or "English + Spanish + French" |
-| What framework is the site built with? | `output.bodyFormat` | Next.js → `'html'`, Hugo → `'markdown'`, Gatsby/MDX → `'mdx'` |
-| Where do blog posts live in the repo? | `output.postsDir` | `_posts/`, `content/blog/`, `src/posts/` |
-| Where do images live? | `output.imagesDir` | `public/images/blog/`, `static/img/` |
-| Do they have a DataForSEO account? | `seo.enabled` | If no → `false` (pipeline still works) |
-| What is the desired tone? | `product.tone` | "Technical but approachable, never salesy" |
-| Any topics to AVOID? | `product.tone` (add negatives) | "Never mention pricing, don't bash competitors" |
+Package: https://www.npmjs.com/package/@stayboba/autoblog
+Docs: https://github.com/arul-buk/autoblog
 
-### Implementation steps
+Here's what I need you to do:
 
-#### 1. Install the package
+STEP 1: GATHER INFORMATION
 
-```bash
-npm install @stayboba/autoblog
+Before doing anything, ask me ALL of the following questions at once (not one by one):
+
+1. Product name — What is the product/brand name?
+2. Product URL — What is the website URL?
+3. Product description — One sentence describing what the product does and who it's for.
+4. Key features — List 3-6 features the AI can reference in blog posts. Be specific
+   (e.g., "Async Standups — automated daily standups across time zones" not just "standups").
+5. Tone — How should the blog sound? (e.g., "Technical but approachable, write for
+   engineering managers" or "Friendly and reassuring, write for non-technical parents")
+6. Topic clusters — What 3-6 content pillars should the blog cover? For each, give me
+   3-8 Google search queries the pipeline will use to find trending topics. Include the
+   current year for recency.
+7. Authors — 1-3 author personas (name, role, which topic clusters they cover). Can be fictional.
+8. Blog post format — Does your site use HTML body (<article><section><h2><p>), markdown, or MDX?
+9. Output directories — Where should posts be saved (e.g., _posts/, src/content/blog/)?
+   Where should cover images go (e.g., public/images/blog/)?
+10. Translations — Do you want posts translated? If yes, which languages?
+    (supported: es, pt, fr, de, zh, ja, ko, ar, hi, etc.)
+11. DataForSEO — Do you have a DataForSEO account for real keyword volume data?
+    (Optional — the pipeline works without it using Gemini-only keyword strategy)
+12. Image style — Any specific visual style for cover images? (e.g., "Swiss Brutalist with
+    dark backgrounds", "watercolor illustrations", or leave blank for the default minimalist style)
+13. GitHub Actions — Do you want this running automatically on a schedule? If yes, how often?
+    (e.g., every 3 days, weekly)
+
+STEP 2: INSTALL AND CONFIGURE
+
+Once I answer the questions above:
+
+1. Run: npm install @stayboba/autoblog
+2. Copy the example config:
+   cp node_modules/@stayboba/autoblog/autoblog.config.example.mjs autoblog.config.mjs
+3. Edit autoblog.config.mjs with my answers — fill in product, authors, topics, output
+   paths, and all settings. Refer to the example config for the full schema.
+4. Create a .env file with:
+   GEMINI_API_KEY=          (I'll fill in the key — get one at https://aistudio.google.com/apikey)
+   DATAFORSEO_LOGIN=        (only if using DataForSEO)
+   DATAFORSEO_PASSWORD=     (only if using DataForSEO)
+5. Add .env and autoblog.config.mjs to .gitignore if not already there
+
+STEP 3: TEST IT
+
+1. Run: npx autoblog --dry-run
+2. Show me the output and confirm it looks correct
+3. If it works, run: npx autoblog (generates one real post)
+4. Verify the post was saved in the correct directory with proper frontmatter
+
+STEP 4: SET UP GITHUB ACTIONS (if requested)
+
+1. Copy the workflow template:
+   cp node_modules/@stayboba/autoblog/templates/github-workflow.yml .github/workflows/auto-blog.yml
+2. Edit the workflow with the correct cron schedule, output paths, and deploy command
+   for my hosting provider (Vercel, Netlify, etc.)
+3. Tell me what GitHub repository secrets I need to add:
+   - GEMINI_API_KEY (required)
+   - DATAFORSEO_LOGIN, DATAFORSEO_PASSWORD (if using DataForSEO)
+   - TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (if you want Telegram notifications)
+
+STEP 5: VERIFY SITE RENDERS THE POSTS
+
+1. Check that my site's blog rendering (frontmatter schema, content format) is compatible
+   with the generated output
+2. If using Astro 6, set up the content collection config with the correct Zod schema
+   (see the README for the full schema)
+3. If using Next.js, verify the markdown/MDX rendering pipeline handles the frontmatter fields
+4. Start the dev server and confirm the generated post renders correctly
+
+IMPORTANT NOTES:
+- The Gemini API key is required. Get one free at https://aistudio.google.com/apikey
+- DataForSEO is optional but recommended for real keyword data (~$0.04-0.20 per post)
+- Each post costs ~$0.02-0.17 depending on pipeline steps enabled
+- The pipeline generates: frontmatter (title, excerpt, author, date, category, coverImage,
+  seoKeywords, readingTime, relatedPosts) + full article body
+- Cover images are 16:9 AI-generated PNGs
+- Do not embed pipeline code in the project — keep autoblog as a package dependency
+- Do not modify autoblog source files — everything is config-driven
+- Start with budget mode (no DataForSEO, no translations), enable features incrementally
 ```
 
-#### 2. Create the config file
+### Architecture rules
 
-Create `autoblog.config.mjs` in the project root with user-provided values:
+- **Do not embed pipeline code in the consuming project.** Keep autoblog as a separate package. The config file is the only project-specific artifact.
+- **Do not modify autoblog source files** to customize behavior. Everything is config-driven.
+- **Schema markup is the website's job.** The pipeline outputs frontmatter; the website renders JSON-LD.
+- **Start with budget mode.** Enable DataForSEO and translations after confirming the basic pipeline works.
+- **The pipeline is stateless.** Reads from disk, writes to disk, exits. No database. Git is the state store.
 
-```js
-export default {
-  product: {
-    name: '',               // from user
-    url: '',                // from user
-    description: '',        // from user
-    features: [],           // from user (array of 'Feature — benefit' strings)
-    cta: { text: 'Get Started Free', url: '' }, // from user
-    tone: '',               // from user (include any "don't" guidance here)
-    brandNames: [],         // product name + any names that shouldn't be translated
-  },
-  authors: [],              // from user (min 2, each needs: name, role, image, categories[])
-  fallbackAuthor: '',       // name of default author
-  topics: {
-    clusters: [],           // from user (each: { name, queries[] })
-  },
-  output: {
-    postsDir: '',           // match project structure
-    imagesDir: '',          // match project structure
-    bodyFormat: '',         // 'html' | 'markdown' | 'mdx' based on framework
-  },
+### Frontmatter schema reference
 
-  // Start conservative — enable features incrementally:
-  seo: { enabled: false },
-  translation: { enabled: false },
-  steps: {
-    calendar: false,
-    keywordResearch: false,
-    humanize: true,
-  },
-};
-```
-
-#### 3. Configure the website to render generated posts
-
-The website needs to:
-
-1. **Read `.md` files** from `output.postsDir` and render frontmatter + body
-2. **Render JSON-LD schema** from `schema` and `qa` frontmatter fields:
+The website needs to render JSON-LD schema from `schema` and `qa` frontmatter fields:
 
 ```js
 // BlogPosting schema
@@ -840,42 +875,12 @@ const faqSchema = {
 };
 ```
 
-3. **Serve cover images** from `output.imagesDir`
-
-#### 4. Test
-
-```bash
-GEMINI_API_KEY=key npx autoblog --dry-run
-```
-
-Verify: config loads → topics discovered → post generated → GEO/AEO score > 70.
-
-#### 5. Generate first real post
-
-```bash
-GEMINI_API_KEY=key npx autoblog
-```
-
-Build the site, verify the post renders with correct schema markup.
-
-#### 6. Set up GitHub Actions (if requested)
-
-Copy `templates/github-workflow.yml` → `.github/workflows/auto-blog.yml`. Update `<!-- CHANGE -->` markers. Add secrets.
-
-### Architecture rules
-
-- **Do not embed pipeline code in the consuming project.** Keep autoblog as a separate package. The config file is the only project-specific artifact.
-- **Do not modify autoblog source files** to customize behavior. Everything is config-driven.
-- **Schema markup is the website's job.** The pipeline outputs frontmatter; the website renders JSON-LD.
-- **Start with budget mode.** Enable DataForSEO and translations after confirming the basic pipeline works.
-- **The pipeline is stateless.** Reads from disk, writes to disk, exits. No database. Git is the state store.
-
 ### Troubleshooting
 
 | Problem | Fix |
 |---------|-----|
 | `Config file not found` | Create `autoblog.config.mjs` or use `--config path` |
-| `GEMINI_API_KEY required` | `export GEMINI_API_KEY=your-key` |
+| `GEMINI_API_KEY required` | `export GEMINI_API_KEY=your-key` or add to `.env` file |
 | `seo.apiLogin required` | Set DataForSEO env vars or set `seo.enabled: false` |
 | `All candidate topics already covered` | Add new queries to `topics.clusters` or use calendar with specific topics |
 | GEO/AEO score below 50 | Usually improves on re-run. Try `steps.humanize: false` temporarily to isolate. |
