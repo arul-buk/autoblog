@@ -679,9 +679,9 @@ const blog = defineCollection({
     author: z.string(),
     category: z.string(),
     tags: z.array(z.string()),
-    seoKeywords: z.string(),
+    seoKeywords: z.string(),  // always comma-separated string (normalized by pipeline)
     readingTime: z.string().optional(),
-    relatedPosts: z.array(z.string()).optional(),
+    relatedPosts: z.array(z.string()).default([]),  // empty array when no related posts
     qa: z.array(z.object({ question: z.string(), answer: z.string() })),
     schema: z.object({
       type: z.string(),
