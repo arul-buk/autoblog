@@ -1,10 +1,10 @@
 {
   "name": "@stayboba/autoblog",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Config-driven automated blog content pipeline powered by Gemini + DataForSEO",
   "type": "module",
   "bin": {
-    "autoblog": "./bin/autoblog.mjs"
+    "autoblog": "bin/autoblog.mjs"
   },
   "main": "./lib/pipeline.mjs",
   "exports": {
@@ -41,7 +41,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/arul-buk/autoblog.git"
+    "url": "git+https://github.com/arul-buk/autoblog.git"
   },
   "homepage": "https://github.com/arul-buk/autoblog#readme",
   "bugs": {
