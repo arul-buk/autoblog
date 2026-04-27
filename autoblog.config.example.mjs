@@ -620,12 +620,47 @@ export default {
   //
   // Skipped silently if credentials are missing.
   // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GOOGLE SEARCH CONSOLE — data-driven topic research (optional).
+  //
+  // Mines GSC data before trending research to find:
+  //   - Quick wins (position 4-15 keywords with decent impressions)
+  //   - Orphan queries (impressions but no dedicated page)
+  //   - Declining pages (>30% click drop, need refreshing)
+  //
+  // SCHEDULE:
+  //   GSC data lags 2-3 days, and rankings need 7-14 days to settle after
+  //   changes. Running GSC mining every pipeline execution wastes API calls
+  //   and reacts to noise. The schedule.frequency controls how often GSC
+  //   mining actually runs, independent of pipeline cron.
+  //
+  //   Recommended frequencies:
+  //     'every-run'  — run every pipeline execution (not recommended)
+  //     'weekly'     — once per 7 days (default, good for keyword research)
+  //     'biweekly'   — once per 14 days (best for meta-optimization actions)
+  //     'monthly'    — once per 30 days (strategic analysis only)
+  //     <number>     — custom interval in days (e.g., 10)
+  //
+  //   When skipped, the pipeline continues without GSC data (trending
+  //   research still runs normally).
+  //
+  // SETUP:
+  //   1. Create a Google Cloud service account with Search Console access
+  //   2. Set GSC_SERVICE_ACCOUNT_JSON env var to the JSON key file path
+  //   3. Add your property URL below
+  //
+  // Skipped silently if credentials are missing.
+  // ═══════════════════════════════════════════════════════════════════════════
   // gsc: {
   //   enabled: false,                    // auto-enables if GSC_SERVICE_ACCOUNT_JSON is set
   //   propertyUrl: 'sc-domain:example.com',
   //   lookbackDays: 90,
   //   quickWinPositionRange: [4, 15],
   //   minImpressions: 50,
+  //   schedule: {
+  //     frequency: 'weekly',             // 'every-run' | 'weekly' | 'biweekly' | 'monthly' | number (days)
+  //     lastRunFile: '.autoblog-gsc-lastrun', // timestamp file (auto-managed, add to .gitignore)
+  //   },
   // },
 
   // ═══════════════════════════════════════════════════════════════════════════
