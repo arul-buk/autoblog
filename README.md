@@ -729,7 +729,11 @@ gsc: {
 }
 ```
 
-**Requires:** `GSC_SERVICE_ACCOUNT_JSON` env var (path to Google service account JSON key file).
+**Requires:** `GSC_SERVICE_ACCOUNT_JSON` env var — supports both:
+- **Service account key** (JSON with `client_email` + `private_key`) — for autonomous GitHub Actions
+- **OAuth user credentials** (JSON with `client_id` + `refresh_token`) — for local development
+
+For service accounts, verify domain ownership via DNS TXT record so the account gets `siteOwner` permission. Add `gsc.quotaProject` with your GCP project ID.
 
 ### Search Intent Classification
 
@@ -786,7 +790,7 @@ When performance data is available, the pipeline:
 - Computes trend per post (strong/moderate/weak based on position)
 - Ignores stale data (> 60 days old)
 
-**Requires:** `GA4_SERVICE_ACCOUNT_JSON` env var for analytics integration.
+**Requires:** `GA4_SERVICE_ACCOUNT_JSON` env var — supports both service account keys and OAuth user credentials (same as GSC). For service accounts, grant Viewer access via the GA4 Admin API or link the GA4 property to your GCP project via BigQuery.
 
 ### GSC Schedule Frequency
 
@@ -841,6 +845,24 @@ contentStrategy: {
 ```
 
 Enable with `steps: { localContent: true }`. The writer receives location-specific guidance (mention local industry, use city in headings, add local FAQ).
+
+### Topic Backlog
+
+Research generates 5-10 candidate topics per run but only 1 gets written. Previously the rest were discarded. Now:
+
+- **Time-sensitive topics** (relevanceScore >= 0.8, breaking news) are written immediately
+- **Evergreen topics** (score < 0.8, guides, comparisons) are saved to `topicBacklog[]` in the context file
+- Next run checks backlog first — picks top topic, only does fresh Gemini research if empty
+- Topics expire after 30 days, capped at 30 entries
+
+```
+Run 1: Research finds 5 topics → writes #1 (breaking news) → saves #2-#4 to backlog
+Run 2: Checks backlog → picks #2 → writes it → #3-#4 remain
+Run 3: Checks backlog → picks #3 → writes it
+Run 4: Backlog empty → fresh Gemini research
+```
+
+**Requires:** `context.enabled: true`. No additional config needed.
 
 ### CMS Direct Publishing
 
@@ -1063,6 +1085,123 @@ const faqSchema = {
 | `All candidate topics already covered` | Add new queries to `topics.clusters` or use calendar with specific topics |
 | GEO/AEO score below 50 | Usually improves on re-run. Try `steps.humanize: false` temporarily to isolate. |
 | Image generation failed | Post saved without image. Non-blocking. Re-run or generate manually. |
+| Local topic deduped, pipeline exits | Fixed in 1.2.0 — now falls back to trending research automatically |
+| DataForSEO returns no data for AU | Fixed in 1.2.0 — Gemini seed keywords used as fallback |
+| `primaryKeyword` null in context | Fixed in 1.2.0 — seeds propagated when DataForSEO unavailable |
+
+---
+
+## 🔐 Google Service Account Setup (GSC + GA4)
+
+One service account handles both GSC and GA4 across all your sites.
+
+### Step 1 — Create GCP project + service account
+
+```bash
+gcloud projects create your-project-id
+gcloud config set project your-project-id
+gcloud services enable searchconsole.googleapis.com analyticsdata.googleapis.com analyticsadmin.googleapis.com siteverification.googleapis.com
+gcloud iam service-accounts create autoblog-agent --display-name="Autoblog Pipeline Agent"
+gcloud iam service-accounts keys create ~/autoblog-service-account.json \
+  --iam-account=autoblog-agent@your-project-id.iam.gserviceaccount.com
+```
+
+### Step 2 — Grant project-level permissions
+
+```bash
+gcloud projects add-iam-policy-binding your-project-id \
+  --member="serviceAccount:autoblog-agent@your-project-id.iam.gserviceaccount.com" \
+  --role="roles/viewer"
+gcloud projects add-iam-policy-binding your-project-id \
+  --member="serviceAccount:autoblog-agent@your-project-id.iam.gserviceaccount.com" \
+  --role="roles/serviceusage.serviceUsageConsumer"
+```
+
+### Step 3 — Verify domains for GSC (DNS method)
+
+```bash
+# Get verification token for each domain
+# (use the Site Verification API — see gsc.mjs for the JWT auth pattern)
+
+# Add TXT record to your DNS (e.g., via Cloudflare API)
+# Then verify via the Site Verification API
+
+# After verification, add the site to GSC:
+# PUT https://searchconsole.googleapis.com/webmasters/v3/sites/sc-domain%3Ayour-domain.com
+```
+
+The service account becomes `siteOwner` with full read access to search analytics.
+
+### Step 4 — Grant GA4 access
+
+Create an OAuth Desktop client in your GCP project (Cloud Console → APIs & Services → Credentials → OAuth client ID → Desktop). Use it to call the GA4 Admin API once:
+
+```bash
+# POST https://analyticsadmin.googleapis.com/v1alpha/accounts/{ACCOUNT_ID}/accessBindings
+# Body: { "user": "autoblog-agent@your-project-id.iam.gserviceaccount.com", "roles": ["predefinedRoles/viewer"] }
+# Requires: analytics.manage.users OAuth scope
+```
+
+This is a one-time operation. The service account then has permanent autonomous access.
+
+### Step 5 — Configure
+
+```bash
+# In .env or shell profile
+export GSC_SERVICE_ACCOUNT_JSON="$HOME/autoblog-service-account.json"
+export GA4_SERVICE_ACCOUNT_JSON="$HOME/autoblog-service-account.json"
+
+# In autoblog.config.mjs
+gsc: {
+  enabled: true,
+  propertyUrl: 'sc-domain:your-domain.com',
+  quotaProject: 'your-project-id',
+  schedule: { frequency: 'weekly' },
+},
+analytics: {
+  enabled: true,
+  propertyId: '123456789',  // GA4 property ID (numeric)
+},
+```
+
+### Step 6 — GitHub Actions secrets
+
+```bash
+gh secret set GSC_SERVICE_ACCOUNT_JSON --repo your-org/your-repo < ~/autoblog-service-account.json
+gh secret set GA4_SERVICE_ACCOUNT_JSON --repo your-org/your-repo < ~/autoblog-service-account.json
+```
+
+---
+
+## 📦 Updating
+
+### From npm
+
+```bash
+npm update @stayboba/autoblog
+```
+
+### From GitHub source
+
+```bash
+npm install github:arul-buk/autoblog
+```
+
+### What to check after updating
+
+1. **Run tests** — `npx autoblog --dry-run` to verify pipeline works with your config
+2. **New config options** — check `autoblog.config.example.mjs` for new sections (all optional, backward compatible)
+3. **Context file** — new fields are added automatically; old context files work without migration
+4. **Strategy file** — `.autoblog-strategy.json` is optional; re-run `--init-strategy` to regenerate with new format options
+
+### Version history
+
+| Version | Changes |
+|---------|---------|
+| **1.2.0** | Context feedback loop, strategy balancer, local content engine, topic backlog, GSC schedule frequency, OAuth credential support, schema embedder fix, 135 tests |
+| **1.1.0** | GSC mining, meta optimizer, cross-model review, schema embedder, context persistence, CMS publishing, intent classification |
+| **1.0.1** | Fix bin path for npx resolution |
+| **1.0.0** | Initial release — core pipeline with 9 steps |
 
 ---
 
