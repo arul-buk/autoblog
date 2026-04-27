@@ -5,3 +5,8 @@ node_modules/
 .DS_Store
 autoblog.config.mjs
 TravelAIAgent/
+
+# Pipeline runtime artifacts
+.autoblog-context.json
+.autoblog-strategy.json
+.autoblog-gsc-lastrun

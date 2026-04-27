@@ -573,26 +573,35 @@ readability: {
 ### Module Map
 
 ```
-bin/autoblog.mjs ─── CLI entry point (parses --dry-run, --batch, --config flags)
+bin/autoblog.mjs ─── CLI entry point (--dry-run, --batch, --config, --init-strategy)
         │
         ▼
-lib/pipeline.mjs ─── Orchestrates 9 steps in sequence
+lib/pipeline.mjs ─── Orchestrates 16 steps in sequence
         │
-        ├── lib/config.mjs ──────────── Loads config, merges defaults, validates
-        ├── lib/prompts.mjs ─────────── All Gemini prompts consolidated (9 prompt builders)
+        ├── lib/config.mjs ──────────── Loads config + .autoblog-strategy.json, merges defaults
+        ├── lib/prompts.mjs ─────────── All Gemini prompts consolidated (12 prompt builders)
         ├── lib/retry.mjs ───────────── Exponential backoff (rate_limit / network / bad_output / fatal)
         ├── lib/scheduler.mjs ───────── Content calendar resolution
+        ├── lib/strategy-balancer.mjs ── Content diversity gap analysis + balancing directive
+        ├── lib/strategy-wizard.mjs ─── Interactive --init-strategy wizard (readline + Gemini)
+        ├── lib/local-content.mjs ───── Template-based geo page generation
+        ├── lib/gsc.mjs ─────────────── Google Search Console mining + schedule frequency
+        ├── lib/context.mjs ─────────── Context persistence + performance feedback loop + GA4
         ├── lib/topics.mjs ──────────── Gemini + Google Search topic discovery
         ├── lib/deduper.mjs ─────────── Semantic deduplication via Gemini
-        ├── lib/keyword-research.mjs ── Intelligent keyword strategy (Gemini) + DataForSEO (4 endpoints)
+        ├── lib/keyword-research.mjs ── Intelligent keyword strategy (Gemini) + DataForSEO
         ├── lib/linker.mjs ──────────── Internal linking (keyword-to-slug index)
         ├── lib/writer.mjs ──────────── Blog post generation with GEO/AEO rules
         ├── lib/style-guide.mjs ─────── Style guide resolver (voice + reference post)
         ├── lib/humanizer.mjs ───────── AI pattern removal + style matching
+        ├── lib/meta-optimizer.mjs ──── CTR-optimized titles (optional)
+        ├── lib/cross-reviewer.mjs ──── Cross-model quality review (optional)
         ├── lib/validator.mjs ───────── Quality gate + GEO/AEO scoring (0 API calls)
         ├── lib/readability.mjs ─────── Flesch-Kincaid grade level (0 API calls)
+        ├── lib/schema-embedder.mjs ─── JSON-LD BlogPosting + FAQPage embedding (optional)
         ├── lib/image-generator.mjs ─── Cover image via Gemini image model
-        └── lib/translator.mjs ──────── Multi-language with brand name preservation
+        ├── lib/translator.mjs ──────── Multi-language with brand name preservation
+        └── lib/publisher.mjs ───────── CMS publishing — 5 adapters (optional)
 ```
 
 ### DataForSEO Endpoints
@@ -652,6 +661,10 @@ Full configuration with every option: [`autoblog.config.example.mjs`](./autoblog
 | `seo` | DataForSEO credentials, location, difficulty/volume thresholds | Has defaults (disabled) |
 | `schedule` | Cron expression, posts per run, content calendar | Has defaults |
 | `readability` | Target Flesch-Kincaid grade range, warn vs. fail | Has defaults |
+| `gsc` | GSC property URL, lookback days, schedule frequency | Optional |
+| `context` | Enable performance feedback loop, file path | Optional |
+| `analytics` | GA4 property ID for pageview/engagement tracking | Optional |
+| `contentStrategy` | Intent mix, format mix, category weights, local content (via `--init-strategy` or `.autoblog-strategy.json`) | Optional |
 
 ### Body format options
 
@@ -700,6 +713,150 @@ Set `output.postsDir` to your Astro content directory (e.g., `src/content/blog`)
 
 ---
 
+## ⚡ Optional Enhancements
+
+All features below are **opt-in**. Each activates only when its config flag is enabled and/or API credentials are present. If credentials are missing or an API call fails, the feature is silently skipped and the pipeline continues normally.
+
+### GSC-Informed Topic Research
+
+Mines Google Search Console data before trending research to find quick-win keywords (position 4-15), orphan queries (high impressions, no dedicated page), and declining pages that need refreshing.
+
+```js
+// In autoblog.config.mjs
+gsc: {
+  enabled: true,
+  propertyUrl: 'sc-domain:example.com',
+}
+```
+
+**Requires:** `GSC_SERVICE_ACCOUNT_JSON` env var (path to Google service account JSON key file).
+
+### Search Intent Classification
+
+Automatically classifies keywords as informational, commercial, transactional, or navigational. The writer then structures the post to match searcher expectations (how-to guide vs. comparison vs. product tutorial).
+
+**No config needed** — automatically enhances existing keyword research when `steps.keywordResearch: true`.
+
+### Meta Tag Optimization
+
+After writing, generates 3 optimized title variants using different hook strategies (curiosity, benefit, specificity) and picks the highest-scoring one. Also optimizes the meta description to 150-160 characters.
+
+```js
+steps: { metaOptimize: true }
+```
+
+**Cost:** ~$0.001 per post (1 Gemini Flash call).
+
+### Cross-Model Quality Review
+
+Sends the post to a stronger model (Gemini Pro) for quality scoring on factual accuracy, keyword naturalness, tone alignment, and structure. If the score is below threshold, automatically rewrites incorporating the feedback.
+
+```js
+steps: { crossModelReview: true },
+crossModel: {
+  model: 'gemini-2.5-pro',
+  qualityThreshold: 7,
+}
+```
+
+**Cost:** ~$0.02-0.05 per post (1 Gemini Pro call, possibly 1 rewrite).
+
+### Embedded JSON-LD Schema
+
+Generates BlogPosting and FAQPage JSON-LD `<script>` blocks from frontmatter and embeds them directly in the post body. Your site renders the post and gets schema markup for free.
+
+```js
+steps: { embedSchema: true },
+output: { siteUrl: 'https://example.com' }
+```
+
+### Context Persistence + Performance Feedback Loop
+
+Maintains a `.autoblog-context.json` file that tracks which topics were generated, what keywords were targeted, and (optionally) performance data from GSC and GA4. **The feedback loop feeds this data back into topic research and keyword strategy** — the pipeline avoids declining keyword angles and prioritizes categories that perform well.
+
+```js
+context: { enabled: true },
+// Optional: GA4 performance tracking
+analytics: { enabled: true, propertyId: '123456789' }
+```
+
+When performance data is available, the pipeline:
+- Injects top-performing and underperforming categories into the research prompt
+- Flags declining keywords (position > 15) to prevent cannibalization
+- Computes trend per post (strong/moderate/weak based on position)
+- Ignores stale data (> 60 days old)
+
+**Requires:** `GA4_SERVICE_ACCOUNT_JSON` env var for analytics integration.
+
+### GSC Schedule Frequency
+
+Control how often GSC data is mined, independent of pipeline cron. GSC data lags 2-3 days and rankings need 7-14 days to settle — running every pipeline execution is wasteful.
+
+```js
+gsc: {
+  enabled: true,
+  propertyUrl: 'sc-domain:example.com',
+  schedule: {
+    frequency: 'weekly',  // 'every-run' | 'weekly' | 'biweekly' | 'monthly' | number (days)
+  },
+}
+```
+
+### Content Strategy + Self-Balancing (`--init-strategy`)
+
+Interactive wizard that asks about your business goals, audience, and competitors, then uses Gemini to recommend an optimal content mix. The pipeline self-balances over time.
+
+```bash
+npx autoblog --init-strategy    # launches interactive wizard
+```
+
+The wizard asks 6 questions, then saves a `.autoblog-strategy.json` with:
+- **Intent mix** — target % for informational, commercial, transactional, navigational
+- **Format mix** — target % for how-to, comparison, listicle, news-analysis, tutorial, local-guide, case-study
+- **Category weights** — relative weight per topic cluster
+- **Local content config** — cities, templates, throttling
+
+Each pipeline run compares actual content distribution against targets. When the mix drifts beyond tolerance (default 10%), the balancer injects a directive into research and keyword prompts (e.g., "prioritize commercial/comparison content").
+
+### Local Content Engine (Programmatic SEO)
+
+Template-based generation of location-specific pages. Define cities and templates; the pipeline generates one per run until all combinations are fulfilled.
+
+```js
+// In .autoblog-strategy.json (generated by wizard) or inline in config
+contentStrategy: {
+  localContent: {
+    enabled: true,
+    locations: [
+      { city: 'Melbourne', region: 'Victoria', country: 'AU' },
+      { city: 'Sydney', region: 'New South Wales', country: 'AU' },
+    ],
+    templates: [
+      'How to Find Verified Building Leads in {city} ({year})',
+      'Best Contractors in {city}: What to Look For',
+    ],
+    maxPerWeek: 1,
+  },
+}
+```
+
+Enable with `steps: { localContent: true }`. The writer receives location-specific guidance (mention local industry, use city in headings, add local FAQ).
+
+### CMS Direct Publishing
+
+After saving files locally, also pushes to your CMS via REST API. Supports WordPress, Ghost, Webflow, Strapi, and Contentful.
+
+```js
+publish: {
+  cms: 'wordpress',  // or 'ghost', 'webflow', 'strapi', 'contentful'
+  draft: true,       // publish as draft
+}
+```
+
+**Auth via env vars** — see the secrets table in the GitHub Actions section below.
+
+---
+
 ## 🤖 Running on Autopilot (GitHub Actions)
 
 ### Setup
@@ -722,6 +879,14 @@ Set `output.postsDir` to your Astro content directory (e.g., `src/content/blog`)
 | `GEMINI_API_KEY` | Yes |
 | `DATAFORSEO_LOGIN` | If `seo.enabled` |
 | `DATAFORSEO_PASSWORD` | If `seo.enabled` |
+| `GSC_SERVICE_ACCOUNT_JSON` | If `gsc.enabled` (GSC topic mining) |
+| `GA4_SERVICE_ACCOUNT_JSON` | If `analytics.enabled` (GA4 performance tracking) |
+| `CMS_ENDPOINT` | If `publish.cms` is set |
+| `CMS_USERNAME` / `CMS_PASSWORD` | WordPress publishing |
+| `CMS_ADMIN_API_KEY` | Ghost publishing (id:secret format) |
+| `CMS_API_TOKEN` | Webflow/Strapi/Contentful publishing |
+| `CMS_COLLECTION_ID` | Webflow publishing |
+| `CMS_SPACE_ID` | Contentful publishing |
 | `VERCEL_TOKEN` | If deploying to Vercel |
 | `TELEGRAM_BOT_TOKEN` | For notifications |
 | `TELEGRAM_CHAT_ID` | For notifications |
@@ -782,6 +947,14 @@ Before doing anything, ask me ALL of the following questions at once (not one by
     dark backgrounds", "watercolor illustrations", or leave blank for the default minimalist style)
 13. GitHub Actions — Do you want this running automatically on a schedule? If yes, how often?
     (e.g., every 3 days, weekly)
+14. Optional enhancements — Do you want any of these? (all are opt-in, all skip gracefully):
+    a. GSC topic mining — Mine Google Search Console for quick-win keywords (needs service account)
+    b. Meta optimization — CTR-optimize titles with 3 variants (~$0.001/post)
+    c. Cross-model review — Quality check via Gemini Pro (~$0.02-0.05/post)
+    d. Embedded JSON-LD — Embed BlogPosting + FAQPage schema in post body
+    e. Context persistence — Track posts + performance across runs
+    f. GA4 analytics — Pull pageview/engagement data (needs service account)
+    g. CMS publishing — Push to WordPress, Ghost, Webflow, Strapi, or Contentful
 
 STEP 2: INSTALL AND CONFIGURE
 
@@ -814,6 +987,11 @@ STEP 4: SET UP GITHUB ACTIONS (if requested)
 3. Tell me what GitHub repository secrets I need to add:
    - GEMINI_API_KEY (required)
    - DATAFORSEO_LOGIN, DATAFORSEO_PASSWORD (if using DataForSEO)
+   - GSC_SERVICE_ACCOUNT_JSON (if using GSC topic mining)
+   - GA4_SERVICE_ACCOUNT_JSON (if using GA4 analytics)
+   - CMS_ENDPOINT, CMS_USERNAME, CMS_PASSWORD (if publishing to WordPress)
+   - CMS_ENDPOINT, CMS_ADMIN_API_KEY (if publishing to Ghost)
+   - CMS_API_TOKEN, CMS_COLLECTION_ID (if publishing to Webflow)
    - TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (if you want Telegram notifications)
 
 STEP 5: VERIFY SITE RENDERS THE POSTS
@@ -895,9 +1073,14 @@ autoblog/
 ├── bin/
 │   └── autoblog.mjs              # CLI entry point
 ├── lib/
-│   ├── config.mjs                 # Config loader + validation
+│   ├── config.mjs                 # Config loader + .autoblog-strategy.json merge
 │   ├── retry.mjs                  # Exponential backoff
 │   ├── scheduler.mjs              # Content calendar
+│   ├── strategy-balancer.mjs      # Content diversity gap analysis (new)
+│   ├── strategy-wizard.mjs        # Interactive --init-strategy wizard (new)
+│   ├── local-content.mjs          # Template-based geo pages (new)
+│   ├── gsc.mjs                    # GSC mining + schedule frequency (new)
+│   ├── context.mjs                # Context persistence + feedback loop + GA4
 │   ├── topics.mjs                 # Topic research (Gemini + Google)
 │   ├── deduper.mjs                # Semantic deduplication
 │   ├── keyword-research.mjs       # Intelligent keyword strategy + DataForSEO
@@ -905,16 +1088,50 @@ autoblog/
 │   ├── writer.mjs                 # Post generation (GEO/AEO compliant)
 │   ├── style-guide.mjs            # Style guide resolver
 │   ├── humanizer.mjs              # AI pattern removal + style matching
+│   ├── meta-optimizer.mjs         # CTR title optimization (optional)
+│   ├── cross-reviewer.mjs         # Cross-model quality review (optional)
 │   ├── validator.mjs              # Quality gate + GEO/AEO scoring
 │   ├── linker.mjs                 # Internal linking
 │   ├── readability.mjs            # Flesch-Kincaid scoring
+│   ├── schema-embedder.mjs        # JSON-LD embedding (optional)
 │   ├── translator.mjs             # Multi-language translation
 │   ├── image-generator.mjs        # Cover image generation
-│   └── pipeline.mjs               # 9-step orchestrator
-├── templates/
-│   └── github-workflow.yml        # GitHub Actions template
+│   ├── publisher.mjs              # CMS publishing — 5 adapters (optional)
+│   └── pipeline.mjs               # 16-step orchestrator
+├── test/
+│   ├── fixtures/                   # Mock data for tests
+│   ├── context-insights.test.mjs   # Context feedback loop (19 tests)
+│   ├── schema-embedder.test.mjs    # JSON-LD schema (13 tests)
+│   ├── strategy-balancer.test.mjs  # Strategy balancing (8 tests)
+│   ├── local-content.test.mjs      # Local content engine (10 tests)
+│   ├── validator.test.mjs          # Post validation + GEO/AEO (20 tests)
+│   ├── readability-scheduler-linker.test.mjs  # Readability + scheduler + linker (26 tests)
+│   ├── meta-optimizer.test.mjs     # Meta tag optimization (13 tests)
+│   ├── cross-reviewer.test.mjs     # Cross-model review (12 tests)
+│   ├── publisher.test.mjs          # CMS publishing (14 tests)
+│   └── simulate-context-diff.mjs   # Interactive scenario simulation tool
 ├── autoblog.config.example.mjs    # Full config reference
-└── package.json
+└── package.json                   # npm test: 135 tests via node:test
+```
+
+---
+
+## 🧪 Testing
+
+135 tests using Node.js built-in `node:test` (zero test dependencies).
+
+```bash
+npm test              # run all 135 tests
+```
+
+### Scenario simulation
+
+Visualize how context and strategy data changes prompts across different scenarios:
+
+```bash
+node test/simulate-context-diff.mjs --diff                    # all scenarios, diff only
+node test/simulate-context-diff.mjs --prompt research          # research prompt only
+node test/simulate-context-diff.mjs --scenario 1,4 --diff      # compare specific scenarios
 ```
 
 ---

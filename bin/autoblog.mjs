@@ -69,18 +69,33 @@ Options:
   --dry-run, -n       Preview without saving files or deploying
   --batch <count>     Generate multiple posts (default: 1)
   --config <path>     Path to config file (default: ./autoblog.config.mjs)
+  --init-strategy     Interactive wizard to generate a content strategy
   --help, -h          Show this help message
 
 Environment variables:
-  GEMINI_API_KEY          Gemini API key (required)
-                          Get one at: https://aistudio.google.com/apikey
+  GEMINI_API_KEY              Gemini API key (required)
+                              Get one at: https://aistudio.google.com/apikey
 
-  DATAFORSEO_LOGIN        DataForSEO login (optional, for keyword research)
-  DATAFORSEO_PASSWORD     DataForSEO password
-                          Sign up at: https://app.dataforseo.com/register
+  DATAFORSEO_LOGIN            DataForSEO login (optional, for keyword research)
+  DATAFORSEO_PASSWORD         DataForSEO password
+                              Sign up at: https://app.dataforseo.com/register
 
-  AUTOBLOG_TEXT_MODEL     Override text model (default: gemini-2.5-flash)
-  AUTOBLOG_IMAGE_MODEL    Override image model (default: gemini-2.5-flash-image)
+  GSC_SERVICE_ACCOUNT_JSON    Google service account JSON path or inline
+                              (optional, for GSC topic mining)
+
+  GA4_SERVICE_ACCOUNT_JSON    Google service account JSON path or inline
+                              (optional, for analytics performance tracking)
+
+  CMS_ENDPOINT                CMS API endpoint (optional, for CMS publishing)
+  CMS_USERNAME / CMS_PASSWORD WordPress basic auth
+  CMS_ADMIN_API_KEY           Ghost Admin API key (id:secret format)
+  CMS_API_TOKEN               Webflow/Strapi/Contentful API token
+  CMS_COLLECTION_ID           Webflow collection ID
+  CMS_SPACE_ID                Contentful space ID
+  CMS_CONTENT_TYPE_ID         Strapi/Contentful content type
+
+  AUTOBLOG_TEXT_MODEL         Override text model (default: gemini-2.5-flash)
+  AUTOBLOG_IMAGE_MODEL        Override image model (default: gemini-2.5-flash-image)
 
 Setup:
   1. cp autoblog.config.example.mjs autoblog.config.mjs
@@ -98,6 +113,7 @@ function parseArgs(args) {
     batch: 1,
     configPath: null,
     help: false,
+    initStrategy: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -106,6 +122,8 @@ function parseArgs(args) {
       parsed.dryRun = true;
     } else if (arg === '--help' || arg === '-h') {
       parsed.help = true;
+    } else if (arg === '--init-strategy') {
+      parsed.initStrategy = true;
     } else if (arg === '--batch' && args[i + 1]) {
       parsed.batch = parseInt(args[i + 1], 10) || 1;
       i++;
@@ -136,6 +154,17 @@ async function main() {
   } catch (err) {
     console.error(`Config error: ${err.message}`);
     process.exit(1);
+  }
+
+  // Run strategy wizard if requested
+  if (args.initStrategy) {
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('Error: GEMINI_API_KEY is required for strategy wizard.');
+      process.exit(1);
+    }
+    const { runStrategyWizard } = await import('../lib/strategy-wizard.mjs');
+    await runStrategyWizard(config, process.env.GEMINI_API_KEY);
+    process.exit(0);
   }
 
   // Check required env vars
