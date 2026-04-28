@@ -17,7 +17,8 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.21.0"
+    "@google/generative-ai": "^0.21.0",
+    "@stayboba/autoblog": "github:arul-buk/autoblog"
   },
   "engines": {
     "node": ">=20.0.0"
