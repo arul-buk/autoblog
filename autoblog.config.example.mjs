@@ -655,12 +655,28 @@ export default {
   //   enabled: false,                    // auto-enables if GSC_SERVICE_ACCOUNT_JSON is set
   //   propertyUrl: 'sc-domain:example.com',
   //   lookbackDays: 90,
-  //   quickWinPositionRange: [4, 15],
-  //   minImpressions: 50,
+  //   quickWinPositionRange: [4, 20],    // Widen to [4, 20] for new sites, narrow to [4, 15] once established
+  //   minImpressions: 1,                 // Start at 1 for new sites (see milestones below)
   //   schedule: {
   //     frequency: 'weekly',             // 'every-run' | 'weekly' | 'biweekly' | 'monthly' | number (days)
   //     lastRunFile: '.autoblog-gsc-lastrun', // timestamp file (auto-managed, add to .gitignore)
   //   },
+  //
+  //   // ── GSC MATURITY MILESTONES ──────────────────────────────────────
+  //   // Adjust minImpressions and quickWinPositionRange as the site grows:
+  //   //
+  //   // NEW SITE (0-50 GSC queries):
+  //   //   minImpressions: 1, quickWinPositionRange: [4, 20]
+  //   //   Every GSC signal matters. Cast a wide net.
+  //   //
+  //   // GROWING (50-200 queries, some with 10+ impressions):
+  //   //   minImpressions: 10, quickWinPositionRange: [4, 15]
+  //   //   Filter noise, focus on validated demand.
+  //   //
+  //   // ESTABLISHED (200+ queries, consistent traffic):
+  //   //   minImpressions: 50, quickWinPositionRange: [4, 15]
+  //   //   Prioritise high-volume opportunities only.
+  //   // ─────────────────────────────────────────────────────────────────
   // },
 
   // ═══════════════════════════════════════════════════════════════════════════
