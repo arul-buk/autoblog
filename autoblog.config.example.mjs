@@ -336,15 +336,19 @@ export default {
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // NOTIFICATIONS — optional post-publish notifications.
+  // NOTIFICATIONS — post-publish notifications sent from within the pipeline.
   //
-  // Currently supports Telegram. Slack support planned.
+  // Telegram: sends a message with post title, site URL, translation count,
+  // and a link to the GitHub Actions run. Non-blocking — if the API call
+  // fails, the pipeline logs a warning and continues.
+  //
   // Omit or set to {} to disable notifications.
   //
   // TELEGRAM SETUP:
   //   1. Message @BotFather on Telegram → /newbot → save the token
   //   2. Message @userinfobot to get your chat ID
   //   3. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID env vars
+  //      (or add them as GitHub Secrets for CI)
   // ═══════════════════════════════════════════════════════════════════════════
   notifications: {
     telegram: {

@@ -77,6 +77,9 @@ jobs:
           # <!-- CHANGE --> Remove these if seo.enabled is false in your config.
           DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
           DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}
+          # <!-- CHANGE --> Remove these if you don't want Telegram notifications.
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           BATCH="${{ github.event.inputs.batch || '1' }}"
           DRY_RUN="${{ github.event.inputs.dry_run }}"
@@ -162,22 +165,21 @@ jobs:
 
           echo "Deploy successful: $DEPLOY_OUTPUT"
 
-      # ─── Notify (Telegram example) ─────────────────────────────────────
-      # <!-- CHANGE --> Remove or replace with your notification system.
-      - name: Notify via Telegram
-        if: ${{ github.event.inputs.dry_run != 'true' && success() }}
+      # ─── Notify failure (Telegram) ──────────────────────────────────────
+      # Success notifications are sent by the pipeline itself (via
+      # notifications.telegram config). This step only fires on failure
+      # as a safety net — the pipeline can't notify if it crashes.
+      # <!-- CHANGE --> Remove if you don't use Telegram notifications.
+      - name: Notify failure via Telegram
+        if: ${{ failure() && github.event.inputs.dry_run != 'true' }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # <!-- CHANGE --> Set your Telegram chat ID (from @userinfobot on Telegram).
-          CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
-
-          SLUG=$(git log -1 --pretty=%s | sed 's/feat(blog): auto-publish //')
-          # <!-- CHANGE --> Set your site URL.
-          POST_URL="https://your-site.example.com/blog/${SLUG}"
-
+          ACTIONS_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MSG="<b>Blog Pipeline Failed</b>%0A%0A<a href=\"${ACTIONS_URL}\">View Logs on GitHub Actions</a>"
           curl -s -X POST \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d chat_id="$CHAT_ID" \
+            -d chat_id="$TELEGRAM_CHAT_ID" \
             -d parse_mode="HTML" \
-            -d text="📝 <b>New blog post published</b>%0A%0A<a href=\"${POST_URL}\">${SLUG}</a>"
+            -d "text=${MSG}"

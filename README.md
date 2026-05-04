@@ -414,7 +414,7 @@ schedule: {
 
 ## ⚙️ How the Pipeline Works
 
-9 steps, executed in sequence. Each step can be turned on or off independently.
+10 steps, executed in sequence. Each step can be turned on or off independently.
 
 ```
 ┌──────────┐   ┌──────────┐   ┌─────────┐   ┌─────────────┐   ┌─────────┐
@@ -423,10 +423,10 @@ schedule: {
 │          │   │  Google)  │   │semantic)│   │             │   │         │
 └──────────┘   └──────────┘   └─────────┘   └─────────────┘   └────┬────┘
                                                                      │
-┌──────────┐   ┌──────────┐   ┌──────────┐   ┌───────────┐          │
-│Translate │<──│  Image   │<──│ Validate │<──│ Humanize  │<─────────┘
-│(Gemini×N)│   │ (Gemini) │   │ (local)  │   │ (Gemini)  │
-└──────────┘   └──────────┘   └──────────┘   └───────────┘
+┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌───────────┐
+│  Notify  │<──│Translate │<──│  Image   │<──│ Validate │<──│ Humanize  │<┘
+│(Telegram)│   │(Gemini×N)│   │ (Gemini) │   │ (local)  │   │ (Gemini)  │
+└──────────┘   └──────────┘   └──────────┘   └──────────┘   └───────────┘
 ```
 
 | # | Step | What happens | API calls | Toggle |
@@ -440,6 +440,7 @@ schedule: {
 | 7 | **Validate** | Local quality check: word count, frontmatter fields, readability score, GEO/AEO compliance score. Zero API calls. | 0 | `steps.validate` |
 | 8 | **Image** | Gemini generates a 16:9 conceptual cover illustration. Saves as PNG. | 1 | `steps.image` |
 | 9 | **Translate** | Translates to each configured language. Brand names preserved. Partial success: saves what succeeds. | N | `steps.translate` |
+| 10 | **Notify** | Sends a Telegram message with post title, site link, translation count, and GitHub Actions link. Runs automatically when `notifications.telegram` is configured. | 1 (Telegram API) | `notifications.telegram` |
 
 ### How the Keyword Step Works
 
@@ -656,7 +657,7 @@ Full configuration with every option: [`autoblog.config.example.mjs`](./autoblog
 | `translation` | Enabled flag, language codes, rate limiting | Has defaults (disabled) |
 | `models` | Gemini model names for text and image | Has defaults |
 | `steps` | Toggle each pipeline step on/off | Has defaults (all on) |
-| `notifications` | Telegram/Slack config | Optional |
+| `notifications` | Telegram notifications — sends a message on each successful publish with post title, site URL, and GitHub Actions link | Optional |
 | `retry` | Max attempts, base delay for exponential backoff | Has defaults |
 | `seo` | DataForSEO credentials, location, difficulty/volume thresholds | Has defaults (disabled) |
 | `schedule` | Cron expression, posts per run, content calendar | Has defaults |
@@ -877,6 +878,26 @@ publish: {
 
 **Auth via env vars** — see the secrets table in the GitHub Actions section below.
 
+### Telegram Notifications
+
+The pipeline sends a Telegram message on each successful publish. The message includes the post title (linked to the live URL), translation count, and a link to the GitHub Actions run.
+
+```js
+notifications: {
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN,
+    chatId: process.env.TELEGRAM_CHAT_ID,
+  },
+},
+```
+
+**Setup:**
+1. Message [@BotFather](https://t.me/BotFather) on Telegram → `/newbot` → save the token
+2. Message [@userinfobot](https://t.me/userinfobot) to get your chat ID
+3. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` as environment variables (or GitHub Secrets for CI)
+
+Notifications are non-blocking — if the Telegram API is unreachable, the pipeline logs a warning and continues. Omit the `notifications` section or leave `botToken`/`chatId` empty to disable.
+
 ---
 
 ## 🤖 Running on Autopilot (GitHub Actions)
@@ -892,7 +913,7 @@ publish: {
    - Cron schedule (match your `schedule.cron`)
    - Git committer email (must be authorized by your deploy platform)
    - Deploy platform config (Vercel by default — swap for Netlify/Cloudflare/GitHub Pages)
-   - Notification config (Telegram chat ID or remove)
+   - Notification config (Telegram is handled by the pipeline — just add the secrets)
 
 3. Add secrets to your GitHub repo (Settings → Secrets → Actions):
 
