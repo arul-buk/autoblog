@@ -20,6 +20,7 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { loadConfig } from '../lib/config.mjs';
 import { runPipeline, saveResults } from '../lib/pipeline.mjs';
+import { sendFailureNotification } from '../lib/notifications.mjs';
 
 /**
  * Load .env file from CWD if it exists (no dependency required).
@@ -242,6 +243,12 @@ Sign up at: https://app.dataforseo.com/register`);
       }
     } catch (err) {
       log(`Pipeline error: ${err.message}`);
+      // Send failure notification (best-effort, don't let notification errors mask the real error)
+      try {
+        await sendFailureNotification(err, config);
+      } catch (_notifyErr) {
+        log(`  Warning: Failure notification failed (${_notifyErr.message})`);
+      }
       if (batchCount > 1) {
         log('Continuing to next batch item...');
         results.push({ status: 'error', error: err.message });

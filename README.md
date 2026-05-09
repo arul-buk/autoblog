@@ -440,7 +440,7 @@ schedule: {
 | 7 | **Validate** | Local quality check: word count, frontmatter fields, readability score, GEO/AEO compliance score. Zero API calls. | 0 | `steps.validate` |
 | 8 | **Image** | Gemini generates a 16:9 conceptual cover illustration. Saves as PNG. | 1 | `steps.image` |
 | 9 | **Translate** | Translates to each configured language. Brand names preserved. Partial success: saves what succeeds. | N | `steps.translate` |
-| 10 | **Notify** | Sends a Telegram message with post title, site link, translation count, and GitHub Actions link. Runs automatically when `notifications.telegram` is configured. | 1 (Telegram API) | `notifications.telegram` |
+| 10 | **Notify** | Sends a Telegram message with post title, description, site link, and GitHub Actions link. On failure, sends error details. Runs automatically when `notifications.telegram` is configured. | 1 (Telegram API) | `notifications.telegram` |
 
 ### How the Keyword Step Works
 
@@ -602,7 +602,8 @@ lib/pipeline.mjs ─── Orchestrates 16 steps in sequence
         ├── lib/schema-embedder.mjs ─── JSON-LD BlogPosting + FAQPage embedding (optional)
         ├── lib/image-generator.mjs ─── Cover image via Gemini image model
         ├── lib/translator.mjs ──────── Multi-language with brand name preservation
-        └── lib/publisher.mjs ───────── CMS publishing — 5 adapters (optional)
+        ├── lib/publisher.mjs ───────── CMS publishing — 5 adapters (optional)
+        └── lib/notifications.mjs ───── Telegram success + failure notifications
 ```
 
 ### DataForSEO Endpoints
@@ -880,7 +881,10 @@ publish: {
 
 ### Telegram Notifications
 
-The pipeline sends a Telegram message on each successful publish. The message includes the post title (linked to the live URL), translation count, and a link to the GitHub Actions run.
+The pipeline sends Telegram messages on both **success** and **failure**:
+
+- **Success:** post title, description/excerpt, site link, Read Post link, and GitHub Actions link
+- **Failure:** error message (truncated to 500 chars), site name, and GitHub Actions link
 
 ```js
 notifications: {
@@ -897,6 +901,8 @@ notifications: {
 3. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` as environment variables (or GitHub Secrets for CI)
 
 Notifications are non-blocking — if the Telegram API is unreachable, the pipeline logs a warning and continues. Omit the `notifications` section or leave `botToken`/`chatId` empty to disable.
+
+All message content is HTML-escaped to prevent Telegram API rejections from special characters (`&`, `<`, `>`) in post titles or descriptions.
 
 ---
 
@@ -1109,6 +1115,7 @@ const faqSchema = {
 | Local topic deduped, pipeline exits | Fixed in 1.2.0 — now falls back to trending research automatically |
 | DataForSEO returns no data for AU | Fixed in 1.2.0 — Gemini seed keywords used as fallback |
 | `primaryKeyword` null in context | Fixed in 1.2.0 — seeds propagated when DataForSEO unavailable |
+| Telegram says "sent" but no message received | Fixed in 1.3.1 — API response body now checked for `ok:false`. Caused by unescaped HTML characters in titles |
 
 ---
 
@@ -1219,6 +1226,8 @@ npm install github:arul-buk/autoblog
 
 | Version | Changes |
 |---------|---------|
+| **1.3.1** | Fix Telegram notifications: HTML-escape titles/descriptions, check API response body for `ok:false`, add description/excerpt to success messages, add failure notifications |
+| **1.3.0** | Telegram notifications, humanizer frontmatter guard |
 | **1.2.0** | Context feedback loop, strategy balancer, local content engine, topic backlog, GSC schedule frequency, OAuth credential support, schema embedder fix, 135 tests |
 | **1.1.0** | GSC mining, meta optimizer, cross-model review, schema embedder, context persistence, CMS publishing, intent classification |
 | **1.0.1** | Fix bin path for npx resolution |
@@ -1271,14 +1280,14 @@ autoblog/
 │   ├── publisher.test.mjs          # CMS publishing (14 tests)
 │   └── simulate-context-diff.mjs   # Interactive scenario simulation tool
 ├── autoblog.config.example.mjs    # Full config reference
-└── package.json                   # npm test: 135 tests via node:test
+└── package.json                   # npm test: 167 tests via node:test
 ```
 
 ---
 
 ## 🧪 Testing
 
-135 tests using Node.js built-in `node:test` (zero test dependencies).
+167 tests using Node.js built-in `node:test` (zero test dependencies).
 
 ```bash
 npm test              # run all 135 tests
