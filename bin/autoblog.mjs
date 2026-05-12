@@ -5,10 +5,15 @@
  * Config-driven automated blog content pipeline.
  *
  * Usage:
- *   npx autoblog                        # Full run
- *   npx autoblog --dry-run              # Preview without saving
- *   npx autoblog --batch 5             # Generate 5 posts
- *   npx autoblog --config ./my.config.mjs  # Custom config path
+ *   npx autoblog                              # Full pipeline
+ *   npx autoblog --dry-run                    # Preview without saving
+ *   npx autoblog --batch 5                    # Generate 5 posts
+ *   npx autoblog --steps research,dedupe      # Run specific steps
+ *   npx autoblog --resume                     # Resume from last checkpoint
+ *   npx autoblog audit                        # Run performance audit
+ *   npx autoblog refresh                      # Check content freshness
+ *   npx autoblog research                     # Research topics only
+ *   npx autoblog --config ./my.config.mjs     # Custom config path
  *
  * Environment variables:
  *   GEMINI_API_KEY (required)
@@ -21,10 +26,11 @@ import { resolve } from 'path';
 import { loadConfig } from '../lib/config.mjs';
 import { runPipeline, saveResults } from '../lib/pipeline.mjs';
 import { sendFailureNotification } from '../lib/notifications.mjs';
+import { resolveSequence, NAMED_SEQUENCES } from '../lib/step-registry.mjs';
+import { findLatestRun } from '../lib/checkpoint.mjs';
 
 /**
  * Load .env file from CWD if it exists (no dependency required).
- * Skips lines that are comments or empty. Does not override existing env vars.
  */
 function loadEnvFile() {
   const envPath = resolve(process.cwd(), '.env');
@@ -41,13 +47,11 @@ function loadEnvFile() {
     const key = trimmed.slice(0, eqIndex).trim();
     let value = trimmed.slice(eqIndex + 1).trim();
 
-    // Strip surrounding quotes
     if ((value.startsWith('"') && value.endsWith('"')) ||
         (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
     }
 
-    // Don't override existing env vars
     if (!(key in process.env)) {
       process.env[key] = value;
     }
@@ -65,13 +69,28 @@ function printHelp() {
 
 Usage:
   npx autoblog [options]
+  npx autoblog <command>
+
+Commands:
+  audit                Run performance audit (GSC + GA4 + GEO tracking)
+  refresh              Check content freshness and flag stale posts
+  research             Research and evaluate topics without generating
 
 Options:
-  --dry-run, -n       Preview without saving files or deploying
-  --batch <count>     Generate multiple posts (default: 1)
-  --config <path>     Path to config file (default: ./autoblog.config.mjs)
-  --init-strategy     Interactive wizard to generate a content strategy
-  --help, -h          Show this help message
+  --dry-run, -n        Preview without saving files or deploying
+  --batch <count>      Generate multiple posts (default: 1)
+  --steps <list>       Run specific steps: research,dedupe,write,validate
+  --resume             Resume from the last failed run's checkpoint
+  --config <path>      Path to config file (default: ./autoblog.config.mjs)
+  --init-strategy      Interactive wizard to generate a content strategy
+  --help, -h           Show this help message
+
+Available steps:
+  schedule, gsc, contextLoad, contentRefresh, competitorAnalysis,
+  topicalAuthority, research, dedupe, keywordResearch, intentFormat,
+  serpFeatures, internalLinking, write, metaOptimize, humanize,
+  crossModelReview, validate, embedSchema, image, translate,
+  contextUpdate, cmsPublish, repurpose, notify
 
 Environment variables:
   GEMINI_API_KEY              Gemini API key (required)
@@ -115,6 +134,9 @@ function parseArgs(args) {
     configPath: null,
     help: false,
     initStrategy: false,
+    steps: null,
+    resume: false,
+    command: null,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -125,12 +147,19 @@ function parseArgs(args) {
       parsed.help = true;
     } else if (arg === '--init-strategy') {
       parsed.initStrategy = true;
+    } else if (arg === '--resume') {
+      parsed.resume = true;
     } else if (arg === '--batch' && args[i + 1]) {
       parsed.batch = parseInt(args[i + 1], 10) || 1;
       i++;
     } else if (arg === '--config' && args[i + 1]) {
       parsed.configPath = args[i + 1];
       i++;
+    } else if (arg === '--steps' && args[i + 1]) {
+      parsed.steps = args[i + 1];
+      i++;
+    } else if (!arg.startsWith('-') && NAMED_SEQUENCES[arg]) {
+      parsed.command = arg;
     }
   }
 
@@ -138,7 +167,6 @@ function parseArgs(args) {
 }
 
 async function main() {
-  // Load .env before anything else
   loadEnvFile();
 
   const args = parseArgs(process.argv.slice(2));
@@ -148,7 +176,6 @@ async function main() {
     process.exit(0);
   }
 
-  // Load and validate config
   let config;
   try {
     config = await loadConfig(args.configPath);
@@ -157,7 +184,7 @@ async function main() {
     process.exit(1);
   }
 
-  // Run strategy wizard if requested
+  // Strategy wizard mode
   if (args.initStrategy) {
     if (!process.env.GEMINI_API_KEY) {
       console.error('Error: GEMINI_API_KEY is required for strategy wizard.');
@@ -203,6 +230,42 @@ Sign up at: https://app.dataforseo.com/register`);
     }
   }
 
+  // Resolve step sequence
+  let sequence = null;
+  let resumeOptions = {};
+
+  if (args.command) {
+    // Named subcommand: audit, refresh, research
+    try {
+      sequence = resolveSequence(args.command);
+      log(`Running sequence: ${args.command}`);
+    } catch (err) {
+      console.error(err.message);
+      process.exit(1);
+    }
+  } else if (args.steps) {
+    // Custom step list
+    try {
+      sequence = resolveSequence(args.steps);
+      log(`Running steps: ${sequence.join(', ')}`);
+    } catch (err) {
+      console.error(err.message);
+      process.exit(1);
+    }
+  } else if (args.resume) {
+    // Resume from last checkpoint
+    const latestRun = findLatestRun(config);
+    if (!latestRun) {
+      console.error('No checkpoint found to resume from.');
+      process.exit(1);
+    }
+    log(`Resuming run ${latestRun.runId} (${latestRun.completedSteps.length} steps completed)`);
+    resumeOptions = {
+      runId: latestRun.runId,
+      resumeCompletedSteps: latestRun.completedSteps,
+    };
+  }
+
   // Determine batch count
   const batchCount = args.batch > 1 ? args.batch : (config.schedule?.postsPerRun || 1);
 
@@ -223,17 +286,16 @@ Sign up at: https://app.dataforseo.com/register`);
       const result = await runPipeline(config, {
         dryRun: args.dryRun,
         additionalSlugs,
+        sequence: sequence || undefined,
+        ...resumeOptions,
       });
 
       results.push(result);
 
       if (result.status === 'success') {
-        // Save files (unless dry run)
         if (!args.dryRun) {
           saveResults(result, config);
         }
-
-        // Add slug to dedupe list for subsequent batch iterations
         additionalSlugs.push(result.slug);
       } else {
         log(`Pipeline ended with status: ${result.status}`);
@@ -243,7 +305,6 @@ Sign up at: https://app.dataforseo.com/register`);
       }
     } catch (err) {
       log(`Pipeline error: ${err.message}`);
-      // Send failure notification (best-effort, don't let notification errors mask the real error)
       try {
         await sendFailureNotification(err, config);
       } catch (_notifyErr) {
@@ -269,8 +330,11 @@ Sign up at: https://app.dataforseo.com/register`);
 
   for (const result of successful) {
     log(`  ✓ ${result.slug} (${result.scheduleMode})`);
-    if (result.translations && result.translations.size > 0) {
-      log(`    Translations: ${[...result.translations.keys()].join(', ')}`);
+    const translations = result.translations instanceof Map
+      ? result.translations
+      : new Map(Object.entries(result.translations || {}));
+    if (translations.size > 0) {
+      log(`    Translations: ${[...translations.keys()].join(', ')}`);
     }
     if (result.imagePath) {
       log(`    Image: ${result.imagePath}`);
@@ -283,7 +347,6 @@ Sign up at: https://app.dataforseo.com/register`);
 
   if (args.dryRun) log('(DRY RUN — nothing was saved to disk)');
 
-  // Exit with error if all posts failed
   if (successful.length === 0 && batchCount > 0) {
     process.exit(1);
   }
