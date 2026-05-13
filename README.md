@@ -454,7 +454,7 @@ lib/runner.mjs ──── Step executor + checkpoint integration
 | **internalLinking** | Keyword-to-slug index for automatic internal links | 0 | `steps.internalLinking` |
 | **write** | Full blog post generation with GEO/AEO rules | 1 | Always on |
 | **metaOptimize** | CTR-optimized title variants + meta description | 1 | `steps.metaOptimize` |
-| **humanize** | AI pattern removal + style matching | 1 | `steps.humanize` |
+| **humanize** | AI pattern removal + style matching (mandatory — auto-injected) | 1 | `steps.humanize` |
 | **crossModelReview** | Quality scoring via stronger model + auto-rewrite | 1 | `steps.crossModelReview` |
 | **validate** | Quality gate + GEO/AEO scoring (zero API calls) | 0 | `steps.validate` |
 | **embedSchema** | JSON-LD BlogPosting + FAQPage embedding | 0 | `steps.embedSchema` |
@@ -635,6 +635,32 @@ npx autoblog
 
 # Resume — skips steps 1-13, continues from image
 npx autoblog --resume
+```
+
+## Safety Guards
+
+### Mandatory Humanization
+
+The humanize step is **non-negotiable** — no content is published without AI pattern removal. This is enforced at two levels:
+
+1. **Auto-injection:** If you specify `--steps write,validate,cmsPublish` without `humanize`, the pipeline auto-injects it after `write` and logs:
+   ```
+   [autoblog] Auto-injected "humanize" step after "write" — humanization is mandatory for all content.
+   ```
+
+2. **Publish blocking:** Before executing `cmsPublish`, `notify`, or `repurpose`, the runner checks that `humanize` has actually run. If content exists but hasn't been humanized, the publishing step is skipped with a warning.
+
+### Category Normalization
+
+LLM-generated categories (e.g., "SEO Quick Win", "Local Guide", "Market Updates") are automatically resolved to the closest matching cluster name from `config.topics.clusters` before slugifying.
+
+Matching strategy: exact match → word-level partial match → stem match → fallback to first cluster.
+
+To override, set explicit valid categories:
+```js
+output: {
+  validCategories: ['Building Costs', 'Renovation', 'Financing'],
+}
 ```
 
 ---
