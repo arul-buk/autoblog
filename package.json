@@ -1,6 +1,6 @@
 {
   "name": "@stayboba/autoblog",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Config-driven automated blog content pipeline powered by Gemini + DataForSEO",
   "type": "module",
   "bin": {
