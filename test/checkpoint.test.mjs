@@ -104,7 +104,7 @@ describe('findLatestRun', () => {
   });
 
   it('finds the most recent run', () => {
-    const config = makeConfig();
+    const config = makeConfig({ maxAgeMs: 86400000 * 365 }); // 1 year to avoid expiry
 
     // Create two runs
     const run1Dir = join(TEST_DIR, '20260101-090000-aaaa');
