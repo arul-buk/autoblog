@@ -663,6 +663,95 @@ output: {
 }
 ```
 
+### Cadence Jitter
+
+Fixed publishing schedules (e.g., every 3 days at 8:17 AM) are a detectable bot signal. Cadence jitter randomly skips runs so posts go out at irregular intervals.
+
+```js
+schedule: {
+  cron: '17 8 */3 * *',
+  skipProbability: 0.3,  // 30% chance to skip → avg ~4.3 days between posts
+}
+```
+
+When a run is skipped, the pipeline exits immediately with zero API cost. Over time, a 3-day cron with 0.3 skip probability produces gaps of 3, 6, 3, 9, 3, 3, 6 days — no fixed pattern.
+
+### Quality Gate
+
+Posts can be rejected before publishing if they don't meet quality thresholds:
+
+```js
+contentQuality: {
+  minPublishScore: 7,  // reject if cross-model review scores below 7/10
+}
+```
+
+The pipeline also auto-rejects posts with GEO/AEO score below 30/100. Rejected posts exit with `quality_rejected` status — no file saved, no deploy, no notification. The topic returns to the backlog for the next run.
+
+### Structure Variation
+
+The writer prompt randomly selects structural elements per post instead of following a fixed template. Each post gets a different combination of:
+
+- TL;DR summary (optional — only when the topic has a clear bottom-line answer)
+- Key Takeaways bullets (optional — only for multi-point topics)
+- Question-based headings (where natural, not forced)
+- Narrative opening with a specific scenario or data point
+- Data table or comparison chart lead
+- FAQ section (optional — only when genuine questions remain unanswered)
+
+This prevents the detectable "every post has TL;DR → Takeaways → Sections → FAQ" footprint that Google's systems flag across hundreds of pages.
+
+### Originality Requirement
+
+Every post is instructed to include at least one insight, data point, or perspective not available in the top 10 Google results. To strengthen this, inject first-party data:
+
+```js
+contentQuality: {
+  firstPartyData: 'Our suburb-level cost database shows Melbourne CBD renovation costs averaged $2,850/sqm in Q1 2026, 12% above the HIA national average.',
+}
+```
+
+This text is injected directly into the writer prompt, giving the LLM proprietary data to reference.
+
+### YAML Frontmatter Auto-Repair
+
+LLM-generated YAML frontmatter commonly has issues that break site builds. The pipeline auto-repairs before validation:
+
+- Unescaped quotes inside values (`title: Best of 2024 "Reviewed"` → properly escaped)
+- Values containing colons without quoting (`title: Cost: A Breakdown` → quoted)
+- Bare numeric values that should be strings (`- 2026` → `- "2026"`)
+- YAML booleans/nulls that should be strings (`category: true` → `category: "true"`)
+
+This eliminates the need for `sed` repair rules in CI workflows.
+
+### Config-Driven Category Map
+
+For sites with strict category schemas, define explicit mappings:
+
+```js
+output: {
+  categoryMap: {
+    'Construction Basics': 'construction-basics',
+    'Market Updates': 'decision-guides',
+    'Local Content': 'state-guides',
+    'SEO Quick Win': 'building-costs',
+  },
+  defaultCategory: 'decision-guides',
+}
+```
+
+Priority: `categoryMap` (explicit) → fuzzy cluster name match → `defaultCategory` → first cluster.
+
+### Local Content Limits
+
+Cap programmatic city pages to prevent pattern #6 (location scaling):
+
+```js
+contentQuality: {
+  maxLocalPagesPerTemplate: 5,  // max 5 cities per template
+}
+```
+
 ---
 
 ## Content Quality and SEO Compliance
@@ -835,7 +924,7 @@ Full configuration with every option: [`autoblog.config.example.mjs`](./autoblog
 | `models` | Gemini model names for text and image | Has defaults |
 | `steps` | Toggle each pipeline step on/off | Has defaults |
 | `checkpoint` | Checkpoint directory, max age, enabled flag | Has defaults (enabled) |
-| `schedule` | Cron expression, posts per run, content calendar | Has defaults |
+| `schedule` | Cron expression, posts per run, content calendar, skip probability (cadence jitter) | Has defaults |
 | `seo` | DataForSEO credentials, location, difficulty/volume thresholds | Has defaults (disabled) |
 | `readability` | Target Flesch-Kincaid grade range, warn vs. fail | Has defaults |
 | `retry` | Max attempts, base delay for exponential backoff | Has defaults |
@@ -851,6 +940,7 @@ Full configuration with every option: [`autoblog.config.example.mjs`](./autoblog
 | `geoTracking` | Brand names, AI platforms to track | Optional (disabled) |
 | `repurpose` | Output formats (twitter, linkedin, newsletter), output directory | Optional (disabled) |
 | `notifications` | Telegram bot token + chat ID | Optional |
+| `contentQuality` | First-party data, min publish score, local page limits, originality flag | Optional |
 | `crossModel` | Review model, quality threshold | Optional |
 | `publish` | CMS adapter (wordpress/ghost/webflow/strapi/contentful), draft mode | Optional |
 
@@ -1199,7 +1289,7 @@ npm update @stayboba/autoblog
 
 | Version | Changes |
 |---------|---------|
-| **2.0.0** | Discrete step architecture (26 steps), step runner + checkpoint system, `--steps` / `--resume` CLI, named sequences (`audit`, `refresh`, `research`), 9 new strategic capabilities (content refresh, performance audit, topical authority, SERP features, competitor analysis, GEO tracking, intent-format, repurposing, cross-model review), 286 tests |
+| **2.0.0** | Discrete step architecture (26 steps), step runner + checkpoint system, `--steps` / `--resume` / `seed` CLI, named sequences (`audit`, `refresh`, `research`), 9 strategic capabilities, anti-pattern safeguards (structure variation, quality gate, originality requirement, cadence jitter, local content limits, YAML auto-repair, category map), per-step cost tracking with Gemini pricing table, `npx autoblog seed` for context backfill, Gemini 3 + 3.1 model support, 288 tests |
 | **1.3.1** | Fix Telegram notifications: HTML-escape, response body check, failure notifications |
 | **1.3.0** | Telegram notifications, humanizer frontmatter guard |
 | **1.2.0** | Context feedback loop, strategy balancer, local content engine, topic backlog, GSC schedule frequency, OAuth support, 135 tests |
