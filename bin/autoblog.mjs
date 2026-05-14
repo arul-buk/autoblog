@@ -357,9 +357,15 @@ Sign up at: https://app.dataforseo.com/register`);
 
   if (args.dryRun) log('(DRY RUN — nothing was saved to disk)');
 
-  if (successful.length === 0 && batchCount > 0) {
+  // Exit with code 1 only for real failures, not expected skips
+  const expectedSkips = ['all_duplicates', 'no_topics', 'skipped_jitter', 'quality_rejected'];
+  const hasRealFailure = results.some((r) => r.status === 'error');
+  const allExpectedSkips = results.every((r) => expectedSkips.includes(r.status) || r.status === 'success');
+
+  if (hasRealFailure) {
     process.exit(1);
   }
+  // Expected skips (jitter, duplicates, quality) exit cleanly
 }
 
 main().catch((err) => {
