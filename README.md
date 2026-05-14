@@ -1129,7 +1129,7 @@ notifications: {
 
 ### Manual trigger
 
-The workflow supports manual execution from the GitHub Actions UI with inputs for `--batch` count and `--dry-run` mode.
+The workflow supports manual execution from the GitHub Actions UI with inputs for batch count, pipeline command (`generate`, `audit`, `refresh`, `research`), and custom step sequences.
 
 ### Batch mode for seeding
 
@@ -1138,6 +1138,130 @@ npx autoblog --batch 10
 ```
 
 Generates 10 posts sequentially. Deduplication is cumulative. If post 5 fails, posts 1-4 are saved and the pipeline continues.
+
+### CI Best Practices
+
+These patterns are recommended for any GitHub Actions workflow running autoblog. They reduce detectable automation signals and improve reliability.
+
+**1. Multiple cron schedules for different tasks**
+
+Don't run everything on one cron. Separate content generation, audits, and freshness checks:
+
+```yaml
+schedule:
+  - cron: '17 8 */3 * *'  # Content generation every 3 days
+  - cron: '0 6 * * 1'     # Weekly audit (Mondays)
+  - cron: '0 6 * * 3'     # Content freshness check (Wednesdays)
+```
+
+Route each cron to the right command in a "Determine pipeline command" step that checks `github.event.schedule`.
+
+**2. Random time jitter on scheduled runs**
+
+A fixed cron time is a bot signal. Add a random sleep (0-90 minutes) before the pipeline runs:
+
+```yaml
+- name: Random time jitter
+  if: github.event_name == 'schedule'
+  run: |
+    JITTER=$((RANDOM % 5400))
+    echo "Sleeping ${JITTER}s (~$((JITTER / 60))min) for time jitter"
+    sleep $JITTER
+```
+
+Only applies to scheduled runs — manual `workflow_dispatch` executes immediately.
+
+**3. Graceful handling of skip statuses**
+
+The pipeline may exit with non-zero codes for expected reasons (all topics duplicated, cadence jitter skip, quality rejection). Treat these as clean exits in CI:
+
+```yaml
+- name: Run autoblog pipeline
+  run: |
+    set +e
+    npx autoblog 2>&1 | tee /tmp/autoblog.log
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -ne 0 ] && grep -q "all_duplicates\|no_topics\|skipped_jitter\|quality_rejected" /tmp/autoblog.log; then
+      echo "Pipeline skipped — not an error"
+      echo "skipped=true" >> $GITHUB_OUTPUT
+      exit 0
+    fi
+    exit $EXIT_CODE
+```
+
+**4. Skip build/deploy for non-content commands**
+
+Audit and refresh runs don't generate content — skip the build, deploy, and notification steps:
+
+```yaml
+- name: Build site
+  if: steps.autoblog.outputs.skipped != 'true' && steps.pipeline.outputs.is_audit != 'true'
+  run: npm run build
+```
+
+**5. YAML frontmatter validation before build**
+
+Even with autoblog's built-in YAML repair, validate frontmatter in CI as a safety net before the site build:
+
+```yaml
+- name: Validate YAML frontmatter
+  run: |
+    for file in src/content/blog/*.md; do
+      node -e "
+        const fs = require('fs');
+        const content = fs.readFileSync('$file', 'utf8');
+        const match = content.match(/^---\n([\s\S]*?)\n---/);
+        if (!match) { process.exit(1); }
+        try { require('js-yaml').load(match[1]); }
+        catch (e) { console.error('Invalid YAML in $file:', e.message); process.exit(1); }
+      " || exit 1
+    done
+```
+
+**6. Commit with rebase to avoid merge conflicts**
+
+Other workflows or manual pushes may have committed while the pipeline ran. Use stash + rebase:
+
+```yaml
+- name: Commit and push
+  run: |
+    git add src/content/blog/ public/images/blog/ .autoblog-context.json
+    if git diff --staged --quiet; then exit 0; fi
+    git commit -m "feat: auto-publish $(date +%Y-%m-%d) blog post"
+    git stash --include-untracked || true
+    git pull --rebase origin main
+    git stash pop || true
+    git push
+```
+
+**7. All credentials via secrets — never in config files**
+
+```yaml
+env:
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
+  DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}
+  GSC_SERVICE_ACCOUNT_JSON: ${{ secrets.GSC_SERVICE_ACCOUNT_JSON }}
+  GA4_SERVICE_ACCOUNT_JSON: ${{ secrets.GA4_SERVICE_ACCOUNT_JSON }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+```
+
+**8. Workflow dispatch with command selection**
+
+Let operators run any pipeline command manually without editing the workflow:
+
+```yaml
+workflow_dispatch:
+  inputs:
+    command:
+      type: choice
+      options: [generate, audit, refresh, research]
+      default: generate
+    steps:
+      description: 'Custom steps (comma-separated, overrides command)'
+      type: string
+```
 
 ---
 
