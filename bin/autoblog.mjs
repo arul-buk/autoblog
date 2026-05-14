@@ -75,6 +75,7 @@ Commands:
   audit                Run performance audit (GSC + GA4 + GEO tracking)
   refresh              Check content freshness and flag stale posts
   research             Research and evaluate topics without generating
+  seed                 Backfill context from existing posts on disk
 
 Options:
   --dry-run, -n        Preview without saving files or deploying
@@ -158,6 +159,8 @@ function parseArgs(args) {
     } else if (arg === '--steps' && args[i + 1]) {
       parsed.steps = args[i + 1];
       i++;
+    } else if (arg === 'seed') {
+      parsed.command = 'seed';
     } else if (!arg.startsWith('-') && NAMED_SEQUENCES[arg]) {
       parsed.command = arg;
     }
@@ -182,6 +185,13 @@ async function main() {
   } catch (err) {
     console.error(`Config error: ${err.message}`);
     process.exit(1);
+  }
+
+  // Seed mode — backfill context from existing posts
+  if (args.command === 'seed') {
+    const { runSeed } = await import('../lib/seeder.mjs');
+    const result = await runSeed(config, { fetchPerformance: true, overwrite: false });
+    process.exit(result.errors.length > 0 ? 1 : 0);
   }
 
   // Strategy wizard mode
