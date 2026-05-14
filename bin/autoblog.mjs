@@ -76,6 +76,8 @@ Commands:
   refresh              Check content freshness and flag stale posts
   research             Research and evaluate topics without generating
   seed                 Backfill context from existing posts on disk
+  authors              Generate detailed author profile pages (E-E-A-T)
+  authors --generate N Create N new synthetic authors for the site
 
 Options:
   --dry-run, -n        Preview without saving files or deploying
@@ -138,6 +140,7 @@ function parseArgs(args) {
     steps: null,
     resume: false,
     command: null,
+    generate: 0,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -161,6 +164,11 @@ function parseArgs(args) {
       i++;
     } else if (arg === 'seed') {
       parsed.command = 'seed';
+    } else if (arg === 'authors') {
+      parsed.command = 'authors';
+    } else if (arg === '--generate' && args[i + 1]) {
+      parsed.generate = parseInt(args[i + 1], 10) || 0;
+      i++;
     } else if (!arg.startsWith('-') && NAMED_SEQUENCES[arg]) {
       parsed.command = arg;
     }
@@ -191,6 +199,17 @@ async function main() {
   if (args.command === 'seed') {
     const { runSeed } = await import('../lib/seeder.mjs');
     const result = await runSeed(config, { fetchPerformance: true, overwrite: false });
+    process.exit(result.errors.length > 0 ? 1 : 0);
+  }
+
+  // Authors mode — generate author profile pages
+  if (args.command === 'authors') {
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('Error: GEMINI_API_KEY is required for author generation.');
+      process.exit(1);
+    }
+    const { runAuthorGenerator } = await import('../lib/author-generator.mjs');
+    const result = await runAuthorGenerator(config, { generate: args.generate });
     process.exit(result.errors.length > 0 ? 1 : 0);
   }
 
