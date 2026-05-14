@@ -113,10 +113,10 @@ describe('validatePost — GEO/AEO', () => {
     assert.equal(hasTldrWarning, false, 'Should not warn about TL;DR when present');
   });
 
-  it('warns when TL;DR is missing', () => {
+  it('does not warn when TL;DR is missing (optional to avoid template footprint)', () => {
     const noTldr = VALID_POST.replace('tldr-section', 'intro-section').replace('TL;DR:', 'Introduction:');
     const result = validatePost(noTldr, baseConfig);
-    assert.ok(result.warnings.some((w) => w.includes('TL;DR')));
+    assert.ok(!result.warnings.some((w) => w.includes('TL;DR')), 'TL;DR is optional — should not warn');
   });
 
   it('detects Key Takeaways section', () => {
