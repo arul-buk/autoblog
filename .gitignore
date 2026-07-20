@@ -10,3 +10,6 @@ TravelAIAgent/
 .autoblog-context.json
 .autoblog-strategy.json
 .autoblog-gsc-lastrun
+.autoblog-checkpoints/
+.claude/
+
